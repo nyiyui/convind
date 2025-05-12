@@ -1,0 +1,7 @@
+{{ template "base.html" $ }}
+{{ define "head-extra" }}
+<script src="/static/js/markdownEditor.js" type="module"></script>
+{{ end }}
+{{ define "body" }}
+<markdown-editor />
+{{ end }}

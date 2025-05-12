@@ -101,3 +101,15 @@ type DataRevision interface {
 	// NewReadCloser returns an [io.ReadCloser] of this revision.
 	NewReadCloser() (io.ReadCloser, error)
 }
+
+type Class interface {
+	// AttemptInstance returns an instance for the given [DataRevision], if applicable.
+	// If not, an error is returned.
+	AttemptInstance(dr DataRevision) (Instance, error)
+}
+
+type Instance interface {
+	DataRevision() DataRevision
+	// NewReadCloser returns an [io.ReadCloser] of this instance.
+	NewReadCloser() (io.ReadCloser, error)
+}

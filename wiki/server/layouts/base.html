@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      main {
+        width: 900px;
+        margin: auto;
+      }
+
+      body {
+        margin: 0;
+      }
+      nav {
+        position: sticky;
+        top: 0;
+        color: #ce86af;
+        background-color: #373b3e;
+        padding: 8px;
+        display: flex;
+        gap: 12px;
+        z-index: 10; /* make nav above events, etc */
+      }
+      nav a {
+        color: #ce86af;
+        text-decoration: none;
+      }
+      nav .right {
+        margin-left: auto;
+      }
+    </style>
+    <title>
+      {{ block "title" $ }}{{ end }}
+    </title>
+    <script type="importmap">
+      {
+        "imports": {
+          "commonmark": "https://cdn.jsdelivr.net/npm/commonmark@0.31.2/+esm"
+        }
+      }
+    </script>
+    {{ block "head-extra" $ }}{{ end }}
+  </head>
+  <body>
+    <nav id="nav-main">
+      <a href="/samples">Samples</a>
+    </nav>
+    <main>
+      {{ template "body" $ }}
+    </main>
+    <footer>
+      {{ vcsInfo }}
+    </footer>
+  </body>
+</html>
