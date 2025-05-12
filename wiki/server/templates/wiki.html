@@ -1,7 +1,14 @@
 {{ template "base.html" $ }}
 {{ define "head-extra" }}
 <script src="/static/js/markdownEditor.js" type="module"></script>
+<script src="/static/js/wiki.js" type="module"></script>
+{{ end }}
+{{ define "nav-extra" }}
+<span>
+  <button id="button-page-new">New Page</button>
+  Revision <code id="revision-id"></code>
+</span>
 {{ end }}
 {{ define "body" }}
-<markdown-editor />
+<markdown-editor id="main-editor" />
 {{ end }}

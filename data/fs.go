@@ -12,32 +12,45 @@ import (
 )
 
 type FSDataStore struct {
-	fs fs.FS
+	prefix string
 }
 
 var _ DataStore = (*FSDataStore)(nil)
 
 // NewFSDataStoreFromSubdirectory returns a new FSDataStore using [os.DirFS].
 func NewFSDataStoreFromSubdirectory(directory string) *FSDataStore {
-	return &FSDataStore{os.DirFS(directory)}
+	return &FSDataStore{directory}
 }
 
 func (f *FSDataStore) GetDataByID(id ID) (Data, error) {
-	_, err := fs.Stat(f.fs, id.String())
+	_, err := os.Stat(filepath.Join(f.prefix, id.String()))
 	if err != nil {
 		return nil, err
 	}
-	raw, err := fs.ReadFile(f.fs, filepath.Join(id.String(), ".datatype"))
+	raw, err := os.ReadFile(filepath.Join(f.prefix, id.String(), ".datatype"))
 	if errors.Is(err, os.ErrNotExist) {
 		raw = []byte("application/octet-stream")
 	} else if err != nil {
 		return nil, fmt.Errorf("reading .datatype: %w", err)
 	}
-	return &FSData{f.fs, id, string(raw)}, nil
+	return &FSData{f.prefix, id, string(raw)}, nil
+}
+
+func (f *FSDataStore) New(mimeType string) (Data, error) {
+	id := GenerateRandomID()
+	err := os.Mkdir(filepath.Join(f.prefix, id.String()), 0700)
+	if err != nil {
+		return nil, err
+	}
+	err = os.WriteFile(filepath.Join(f.prefix, id.String(), ".datatype"), []byte(mimeType), 0600)
+	if err != nil {
+		return nil, err
+	}
+	return &FSData{f.prefix, id, mimeType}, nil
 }
 
 type FSData struct {
-	fs       fs.FS
+	prefix   string
 	id       ID
 	mimeType string
 }
@@ -49,7 +62,7 @@ func (f *FSData) ID() ID {
 }
 
 func (f *FSData) Revisions() ([]DataRevision, error) {
-	entries, err := fs.ReadDir(f.fs, f.id.String())
+	entries, err := os.ReadDir(filepath.Join(f.prefix, f.id.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -64,16 +77,34 @@ func (f *FSData) Revisions() ([]DataRevision, error) {
 			if err != nil {
 				return nil, fmt.Errorf("stat %s", entry.Name())
 			}
-			revisions[i] = &FSRevision{f.fs, f.id, info, revisionID, f.mimeType}
+			revisions[i] = &FSRevision{f.prefix, f.id, info, revisionID, f.mimeType}
 		}
 	}
 	return revisions, nil
 }
 
+func (f *FSData) NewRevision(r io.Reader) (DataRevision, error) {
+	revisionID := GenerateRandomID().Random
+	file, err := os.Create(filepath.Join(f.prefix, f.id.String(), strconv.FormatUint(revisionID, 10)))
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	_, err = io.Copy(file, r)
+	if err != nil {
+		return nil, err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	return &FSRevision{f.prefix, f.id, info, revisionID, f.mimeType}, nil
+}
+
 func (f *FSData) MIMEType() string { return f.mimeType }
 
 type FSRevision struct {
-	fs         fs.FS
+	prefix     string
 	id         ID
 	info       fs.FileInfo
 	revisionID uint64
@@ -81,7 +112,7 @@ type FSRevision struct {
 }
 
 func (f *FSRevision) Data() Data {
-	return &FSData{f.fs, f.id, f.mimeType}
+	return &FSData{f.prefix, f.id, f.mimeType}
 }
 
 // RevisionID is a unique number representing this revision.
@@ -96,5 +127,5 @@ func (f *FSRevision) CreationTime() time.Time {
 }
 
 func (f *FSRevision) NewReadCloser() (io.ReadCloser, error) {
-	return f.fs.Open(filepath.Join(f.id.String(), strconv.FormatUint(f.revisionID, 10)))
+	return os.Open(filepath.Join(f.prefix, f.id.String(), strconv.FormatUint(f.revisionID, 10)))
 }

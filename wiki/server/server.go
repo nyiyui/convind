@@ -6,6 +6,8 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"path/filepath"
+	"strconv"
 
 	"github.com/google/safehtml/template"
 	"inaba.kiyuri.ca/2025/convind/data"
@@ -41,7 +43,8 @@ func (s *Server) setupRoutes() {
 	}
 	s.mux.Handle("GET /static/js/", http.StripPrefix("/static/js/", http.FileServer(http.FS(javascriptFS2))))
 
-	s.mux.HandleFunc("GET /api/v1/page/{id}", s.handlePage)
+	s.mux.HandleFunc("/api/v1/page/{id}", s.handlePage)
+	s.mux.HandleFunc("POST /api/v1/page/new", s.handlePageNew)
 
 	s.mux.HandleFunc("GET /wiki", s.handleWiki)
 }
@@ -60,19 +63,44 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	page := wiki.Page{data}
-	pr, err := page.LatestRevision()
+	switch r.Method {
+	case "GET":
+		pr, err := page.LatestRevision()
+		if err != nil {
+			http.Error(w, fmt.Sprint(err), 500)
+			return
+		}
+		if pr == nil {
+			http.Error(w, "", 204)
+			return
+		}
+		w.Header().Set("Revision-ID", strconv.FormatUint(pr.DataRevision.RevisionID(), 10))
+		rc, err := pr.DataRevision.NewReadCloser()
+		defer rc.Close()
+		_, err = io.Copy(w, rc)
+		if err != nil {
+			http.Error(w, fmt.Sprint(err), 500)
+			// probably, the 200 header has already been written, but whatever
+			return
+		}
+	case "POST":
+		dr, err := data.NewRevision(r.Body)
+		if err != nil {
+			http.Error(w, fmt.Sprint(err), 500)
+			return
+		}
+		w.Header().Set("Revision-ID", strconv.FormatUint(dr.RevisionID(), 10))
+		http.Error(w, "", 204)
+	}
+}
+
+func (s *Server) handlePageNew(w http.ResponseWriter, r *http.Request) {
+	data, err := s.dataStore.New("text/markdown")
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
 		return
 	}
-	rc, err := pr.DataRevision.NewReadCloser()
-	defer rc.Close()
-	_, err = io.Copy(w, rc)
-	if err != nil {
-		http.Error(w, fmt.Sprint(err), 500)
-		// probably, the 200 header has already been written, but whatever
-		return
-	}
+	http.Redirect(w, r, filepath.Join("/api/v1/page/", data.ID().String()), 302)
 }
 
 func (s *Server) handleWiki(w http.ResponseWriter, r *http.Request) {

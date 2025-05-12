@@ -11,11 +11,21 @@ function indexOfPos(pos, source) {
   return index+(col-1);
 }
 
+function fixCorvindLinks(walker) {
+  for (let entry = walker.next(); entry != null; entry = walker.next()) {
+    const { node } = entry;
+    if (node.type == "link") {
+      if (node.destination.startsWith("convind://")) {
+        node.destination = "/wiki?id=" + node.destination.slice(10)
+      }
+    }
+  }
+}
+
 class MarkdownEditor extends HTMLElement {
   constructor() {
     super();
-    this.source = '# Title\nbody text';
-    this.source += '\n\na'.repeat(30);
+    this.source = '';
     this.parser = new Parser();
     this.renderer = new HtmlRenderer({sourcepos: true});
     this.viewer = null;
@@ -50,12 +60,18 @@ class MarkdownEditor extends HTMLElement {
     wrapper.appendChild(this.editor);
     shadow.appendChild(wrapper);
   }
+  setValue(s) {
+    this.source = this.editor.value = s;
+    this.render();
+  }
   onChange(event) {
     this.source = this.editor.value;
     this.render();
   }
   render() {
     const parsed = this.parser.parse(this.source)
+    fixCorvindLinks(parsed.walker());
+    console.log(parsed);
     const result = this.renderer.render(parsed);
     this.viewer.innerHTML = result;
   }

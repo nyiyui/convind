@@ -2,7 +2,6 @@ package wiki
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"strconv"
 
@@ -32,6 +31,7 @@ func (p *Page) Revisions() ([]*PageRevision, error) {
 	return result, nil
 }
 
+// LatestRevision returns the latest revision if available, and nil is there are no revisions at all.
 func (p *Page) LatestRevision() (*PageRevision, error) {
 	revisions, err := p.Data.Revisions()
 	if err != nil {
@@ -44,7 +44,7 @@ func (p *Page) LatestRevision() (*PageRevision, error) {
 		}
 	}
 	if latestRevision == nil {
-		return nil, errors.New("no revisions")
+		return nil, nil
 	}
 	return &PageRevision{latestRevision}, nil
 }

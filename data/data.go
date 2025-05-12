@@ -79,12 +79,15 @@ func (i *ID) UnmarshalText(rawText []byte) (err error) {
 
 type DataStore interface {
 	GetDataByID(ID) (Data, error)
+	New(mimeType string) (Data, error)
 }
 
 type Data interface {
 	ID() ID
 	// Revisions returns all (known) revisions, sorted newest to oldest.
 	Revisions() ([]DataRevision, error)
+	// NewRevision creates a new revision and returns said revision.
+	NewRevision(r io.Reader) (DataRevision, error)
 	// MIMEType returns the MIME type of this revision.
 	MIMEType() string
 }
