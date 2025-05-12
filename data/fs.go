@@ -1,9 +1,11 @@
 package data
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -20,12 +22,19 @@ func (f *FSDataStore) GetDataByID(id ID) (Data, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &FSData{f.fs, id}, nil
+	raw, err := fs.ReadFile(f.fs, filepath.Join(id.String(), ".datatype"))
+	if errors.Is(err, os.ErrNotExist) {
+		raw = []byte("application/octet-stream")
+	} else if err != nil {
+		return nil, fmt.Errorf("reading .datatype: %w", err)
+	}
+	return &FSData{f.fs, id, string(raw)}, nil
 }
 
 type FSData struct {
-	fs fs.FS
-	id ID
+	fs       fs.FS
+	id       ID
+	mimeType string
 }
 
 var _ Data = (*FSData)(nil)
@@ -41,39 +50,39 @@ func (f *FSData) Revisions() ([]DataRevision, error) {
 	}
 	revisions := make([]DataRevision, 0, len(entries))
 	for i, entry := range entries {
-		revisionID, err := strconv.ParseUint(entry.Name(), 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("parse revision id of %s: %w", entry.Name(), err)
+		if entry.Name()[0] != '.' {
+			revisionID, err := strconv.ParseUint(entry.Name(), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("parse revision id of %s: %w", entry.Name(), err)
+			}
+			info, err := entry.Info()
+			if err != nil {
+				return nil, fmt.Errorf("stat %s", entry.Name())
+			}
+			revisions[i] = &FSRevision{f.fs, f.id, info, revisionID, f.mimeType}
 		}
-		info, err := entry.Info()
-		if err != nil {
-			return nil, fmt.Errorf("stat %s", entry.Name())
-		}
-		revisions[i] = &FSRevision{f.fs, f.id, info, revisionID}
 	}
 	return revisions, nil
 }
+
+func (f *FSData) MIMEType() string { return f.mimeType }
 
 type FSRevision struct {
 	fs         fs.FS
 	id         ID
 	info       fs.FileInfo
 	revisionID uint64
+	mimeType   string
 }
 
 func (f *FSRevision) Data() Data {
-	return &FSData{f.fs, f.id}
+	return &FSData{f.fs, f.id, f.mimeType}
 }
 
 // RevisionID is a unique number representing this revision.
 // This number can be a random number, and is not necessarily incremental.
 func (f *FSRevision) RevisionID() uint64 {
 	return f.revisionID
-}
-
-// Datatype returns the MIME type of this revision.
-func (f *FSRevision) Datatype() string {
-	return "application/octet-stream"
 }
 
 // CreationTime returns the time this revision was created.

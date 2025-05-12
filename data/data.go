@@ -85,6 +85,8 @@ type Data interface {
 	ID() ID
 	// Revisions returns all (known) revisions, sorted newest to oldest.
 	Revisions() ([]DataRevision, error)
+	// MIMEType returns the MIME type of this revision.
+	MIMEType() string
 }
 
 // DataRevision is a handle to a revision of data.
@@ -94,8 +96,6 @@ type DataRevision interface {
 	// RevisionID is a unique number representing this revision.
 	// This number can be a random number, and is not necessarily incremental.
 	RevisionID() uint64
-	// Datatype returns the MIME type of this revision.
-	Datatype() string
 	// CreationTime returns the time this revision was created.
 	CreationTime() time.Time
 	// NewReadCloser returns an [io.ReadCloser] of this revision.
