@@ -2,6 +2,7 @@ package server
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
@@ -43,10 +44,12 @@ func (s *Server) setupRoutes() {
 	}
 	s.mux.Handle("GET /static/js/", http.StripPrefix("/static/js/", http.FileServer(http.FS(javascriptFS2))))
 
-	s.mux.HandleFunc("/api/v1/page/{id}", s.handlePage)
+	s.mux.HandleFunc("GET /api/v1/page/{id}", s.handlePage)
+	s.mux.HandleFunc("POST /api/v1/page/{id}", s.handlePage)
 	s.mux.HandleFunc("POST /api/v1/page/new", s.handlePageNew)
+	s.mux.HandleFunc("GET /api/v1/pages", s.handlePageList)
 
-	s.mux.HandleFunc("GET /wiki", s.handleWiki)
+	s.mux.HandleFunc("GET /", s.handleSPA)
 }
 
 func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
@@ -103,6 +106,29 @@ func (s *Server) handlePageNew(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, filepath.Join("/api/v1/page/", data.ID().String()), 302)
 }
 
-func (s *Server) handleWiki(w http.ResponseWriter, r *http.Request) {
-	s.renderTemplate("wiki.html", w, r, map[string]interface{}{})
+func (s *Server) handlePageList(w http.ResponseWriter, r *http.Request) {
+	ids, err := s.dataStore.AllIDs()
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	datas := make([]data.Data, len(ids))
+	for i, id := range ids {
+		datas[i], err = s.dataStore.GetDataByID(id)
+		if err != nil {
+			http.Error(w, fmt.Sprint(err), 500)
+			return
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(w).Encode(datas)
+	if err != nil {
+		// probably, the 200 header has already been written, but whatever
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+}
+
+func (s *Server) handleSPA(w http.ResponseWriter, r *http.Request) {
+	s.renderTemplate("spa.html", w, r, map[string]interface{}{})
 }

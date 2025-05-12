@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -49,6 +50,24 @@ func (f *FSDataStore) New(mimeType string) (Data, error) {
 	return &FSData{f.prefix, id, mimeType}, nil
 }
 
+func (f *FSDataStore) AllIDs() ([]ID, error) {
+	entries, err := os.ReadDir(f.prefix)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]ID, len(entries))
+	for i, entry := range entries {
+		if entry.Name()[0] == '.' {
+			continue
+		}
+		ids[i], err = ParseID(entry.Name())
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ids, nil
+}
+
 type FSData struct {
 	prefix   string
 	id       ID
@@ -66,8 +85,8 @@ func (f *FSData) Revisions() ([]DataRevision, error) {
 	if err != nil {
 		return nil, err
 	}
-	revisions := make([]DataRevision, len(entries))
-	for i, entry := range entries {
+	revisions := make([]DataRevision, 0, len(entries))
+	for _, entry := range entries {
 		if entry.Name()[0] != '.' {
 			revisionID, err := strconv.ParseUint(entry.Name(), 10, 64)
 			if err != nil {
@@ -77,7 +96,7 @@ func (f *FSData) Revisions() ([]DataRevision, error) {
 			if err != nil {
 				return nil, fmt.Errorf("stat %s", entry.Name())
 			}
-			revisions[i] = &FSRevision{f.prefix, f.id, info, revisionID, f.mimeType}
+			revisions = append(revisions, &FSRevision{f.prefix, f.id, info, revisionID, f.mimeType})
 		}
 	}
 	return revisions, nil
@@ -101,7 +120,11 @@ func (f *FSData) NewRevision(r io.Reader) (DataRevision, error) {
 	return &FSRevision{f.prefix, f.id, info, revisionID, f.mimeType}, nil
 }
 
-func (f *FSData) MIMEType() string { return f.mimeType }
+func (f *FSData) MIMEType() string { return strings.TrimSpace(f.mimeType) }
+
+func (f *FSData) MarshalJSON() ([]byte, error) {
+	return MarshalData(f)
+}
 
 type FSRevision struct {
 	prefix     string

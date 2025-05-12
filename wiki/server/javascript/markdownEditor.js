@@ -16,7 +16,7 @@ function fixCorvindLinks(walker) {
     const { node } = entry;
     if (node.type == "link") {
       if (node.destination.startsWith("convind://")) {
-        node.destination = "/wiki?id=" + node.destination.slice(10)
+        node.destination = "/page/" + node.destination.slice(10)
       }
     }
   }
@@ -71,13 +71,13 @@ class MarkdownEditor extends HTMLElement {
   render() {
     const parsed = this.parser.parse(this.source)
     fixCorvindLinks(parsed.walker());
-    console.log(parsed);
     const result = this.renderer.render(parsed);
     this.viewer.innerHTML = result;
   }
   onClick(event) {
+    if (event.target == "A") return;
     const sourcepos = event.target.dataset.sourcepos;
-    console.log(sourcepos);
+    if (!sourcepos) return; // give up
     const [startIndex, endIndex] = sourcepos.split("-").map((pos) => indexOfPos(pos, this.source));
     this.editor.focus();
     this.editor.setSelectionRange(startIndex, endIndex+1);

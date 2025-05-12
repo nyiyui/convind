@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -55,6 +56,15 @@ func (i ID) MarshalText() ([]byte, error) {
 	return i.asBuffer().Bytes(), nil
 }
 
+func ParseID(s string) (ID, error) {
+	i := new(ID)
+	err := i.UnmarshalText([]byte(s))
+	if err != nil {
+		return ID{}, err
+	}
+	return *i, nil
+}
+
 func (i *ID) UnmarshalText(rawText []byte) (err error) {
 	decoder := base64.NewDecoder(base64.URLEncoding, bytes.NewBuffer(rawText))
 	text, err := io.ReadAll(decoder)
@@ -80,6 +90,7 @@ func (i *ID) UnmarshalText(rawText []byte) (err error) {
 type DataStore interface {
 	GetDataByID(ID) (Data, error)
 	New(mimeType string) (Data, error)
+	AllIDs() ([]ID, error)
 }
 
 type Data interface {
@@ -90,6 +101,8 @@ type Data interface {
 	NewRevision(r io.Reader) (DataRevision, error)
 	// MIMEType returns the MIME type of this revision.
 	MIMEType() string
+	// MarshalJSON implements [json.Marshaler].
+	MarshalJSON() ([]byte, error)
 }
 
 // DataRevision is a handle to a revision of data.
@@ -115,4 +128,42 @@ type Instance interface {
 	DataRevision() DataRevision
 	// NewReadCloser returns an [io.ReadCloser] of this instance.
 	NewReadCloser() (io.ReadCloser, error)
+}
+
+type dataJSON struct {
+	ID        ID
+	Revisions []dataRevisionJSON
+	MIMEType  string
+}
+
+func MarshalData(d Data) ([]byte, error) {
+	obj, err := dataToJSON(d)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(obj)
+}
+
+func dataToJSON(d Data) (dataJSON, error) {
+	revisions, err := d.Revisions()
+	if err != nil {
+		return dataJSON{}, err
+	}
+	revisions2 := make([]dataRevisionJSON, len(revisions))
+	for i, revision := range revisions {
+		if revision == nil {
+			panic('a')
+		}
+		revisions2[i] = dataRevisionToJSON(revision)
+	}
+	return dataJSON{d.ID(), revisions2, d.MIMEType()}, nil
+}
+
+type dataRevisionJSON struct {
+	RevisionID   uint64
+	CreationTime time.Time
+}
+
+func dataRevisionToJSON(dr DataRevision) dataRevisionJSON {
+	return dataRevisionJSON{dr.RevisionID(), dr.CreationTime()}
 }
