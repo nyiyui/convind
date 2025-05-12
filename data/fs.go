@@ -17,6 +17,11 @@ type FSDataStore struct {
 
 var _ DataStore = (*FSDataStore)(nil)
 
+// NewFSDataStoreFromSubdirectory returns a new FSDataStore using [os.DirFS].
+func NewFSDataStoreFromSubdirectory(directory string) *FSDataStore {
+	return &FSDataStore{os.DirFS(directory)}
+}
+
 func (f *FSDataStore) GetDataByID(id ID) (Data, error) {
 	_, err := fs.Stat(f.fs, id.String())
 	if err != nil {
@@ -48,7 +53,7 @@ func (f *FSData) Revisions() ([]DataRevision, error) {
 	if err != nil {
 		return nil, err
 	}
-	revisions := make([]DataRevision, 0, len(entries))
+	revisions := make([]DataRevision, len(entries))
 	for i, entry := range entries {
 		if entry.Name()[0] != '.' {
 			revisionID, err := strconv.ParseUint(entry.Name(), 10, 64)
