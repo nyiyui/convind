@@ -33,7 +33,7 @@ func (i ID) asBuffer() *bytes.Buffer {
 	buf := new(bytes.Buffer)
 	encoder := base64.NewEncoder(base64.URLEncoding, buf)
 	encoder.Write([]byte(idPrefix))
-	b := make([]byte, 0, 64/8)
+	b := make([]byte, 64/8)
 	binary.LittleEndian.PutUint64(b, uint64(i.Epoch))
 	_, err := encoder.Write(b)
 	if err != nil {
@@ -72,6 +72,7 @@ func (i *ID) UnmarshalText(rawText []byte) (err error) {
 	if epoch > (1<<63 - 1) {
 		return fmt.Errorf("epoch %d too large", epoch)
 	}
+	i.Epoch = int64(epoch)
 	i.Random = binary.LittleEndian.Uint64(text[len(idPrefix)+64/8 : len(idPrefix)+64/8+64/8])
 	return nil
 }
