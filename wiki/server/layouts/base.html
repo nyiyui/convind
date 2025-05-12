@@ -14,16 +14,25 @@
       nav {
         position: sticky;
         top: 0;
-        color: #ce86af;
-        background-color: #373b3e;
+        color: #6032a8;
+        background-color: #cdc;
         padding: 8px;
         display: flex;
         gap: 12px;
         z-index: 10; /* make nav above events, etc */
       }
       nav a {
-        color: #ce86af;
         text-decoration: none;
+      }
+      @media (prefers-color-scheme: dark) {
+        nav, nav a {
+          color: #8067a8;
+          background-color: #131;
+        }
+        body {
+          color: #eee;
+          background-color: #111
+        }
       }
       nav .right {
         margin-left: auto;
@@ -43,7 +52,7 @@
   </head>
   <body>
     <nav id="nav-main">
-      <a href="/samples">Samples</a>
+      <a href="/page-list">Page List</a>
       {{ template "nav-extra" $ }}
     </nav>
     <main>

@@ -7,3 +7,10 @@ Wiki pages are stored in Markdown format, where:
 Markdown format here means CommonMark with (potentially) a few extensions, such as:
 - the strikethrough extension, and
 - the autolinks extension.
+
+## TODO
+
+- link auto-completion
+- backlinks
+- 2-hop links
+- list of all pages
