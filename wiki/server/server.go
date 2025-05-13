@@ -21,15 +21,21 @@ var javascriptFS embed.FS
 type Server struct {
 	mux       *http.ServeMux
 	dataStore data.DataStore
+	hops      *wiki.HopsClass
 	tps       map[string]*template.Template
 }
 
-func New(dataStore data.DataStore) *Server {
+func New(dataStore data.DataStore) (*Server, error) {
 	s := new(Server)
 	s.dataStore = dataStore
+	s.hops = wiki.NewHopsClass(s.dataStore)
+	err := s.hops.Load()
+	if err != nil {
+		return nil, err
+	}
 	s.parseTemplates()
 	s.setupRoutes()
-	return s
+	return s, nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -44,6 +50,7 @@ func (s *Server) setupRoutes() {
 	}
 	s.mux.Handle("GET /static/js/", http.StripPrefix("/static/js/", http.FileServer(http.FS(javascriptFS2))))
 
+	s.mux.HandleFunc("GET /api/v1/page/{id}/hop", s.handlePageHop)
 	s.mux.HandleFunc("GET /api/v1/page/{id}", s.handlePage)
 	s.mux.HandleFunc("POST /api/v1/page/{id}", s.handlePage)
 	s.mux.HandleFunc("POST /api/v1/page/new", s.handlePageNew)
@@ -131,4 +138,42 @@ func (s *Server) handlePageList(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSPA(w http.ResponseWriter, r *http.Request) {
 	s.renderTemplate("spa.html", w, r, map[string]interface{}{})
+}
+
+func (s *Server) handlePageHop(w http.ResponseWriter, r *http.Request) {
+	idRaw := r.PathValue("id")
+	id := new(data.ID)
+	err := id.UnmarshalText([]byte(idRaw))
+	if err != nil {
+		http.Error(w, "invalid id", 404)
+		return
+	}
+	data, err := s.dataStore.GetDataByID(*id)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	page := wiki.Page{data}
+	pr, err := page.LatestRevision()
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	if pr == nil {
+		http.Error(w, "", 204)
+		return
+	}
+	w.Header().Set("Revision-ID", strconv.FormatUint(pr.DataRevision.RevisionID(), 10))
+	i, err := s.hops.AttemptInstance(pr.DataRevision)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	rc, err := i.NewReadCloser()
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	io.Copy(w, rc)
 }

@@ -17,7 +17,10 @@ func main() {
 	flag.Parse()
 
 	dataStore := data.NewFSDataStoreFromSubdirectory(dataStorePath)
-	s := server.New(dataStore)
+	s, err := server.New(dataStore)
+	if err != nil {
+		panic(err)
+	}
 	log.Printf("listening on %s…", bind)
 	log.Fatal(http.ListenAndServe(bind, s))
 }

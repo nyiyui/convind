@@ -28,8 +28,8 @@ class MarkdownEditor extends HTMLElement {
     this.source = '';
     this.parser = new Parser();
     this.renderer = new HtmlRenderer({sourcepos: true});
-    this.viewer = null;
-    this.editor = null;
+    this.viewer = document.createElement("div");
+    this.editor = document.createElement("textarea");
   }
   connectedCallback() {
     const shadow = this.attachShadow({mode: "open"});
@@ -48,12 +48,10 @@ class MarkdownEditor extends HTMLElement {
 
     const wrapper = document.createElement("div");
     wrapper.classList.add('wrapper');
-    this.viewer = document.createElement("div");
     this.viewer.classList.add('viewer');
     this.viewer.addEventListener("click", this.onClick.bind(this));
     this.render();
     wrapper.appendChild(this.viewer);
-    this.editor = document.createElement("textarea");
     this.editor.classList.add('editor');
     this.editor.value = this.source;
     this.editor.addEventListener("input", this.onChange.bind(this));
@@ -85,3 +83,5 @@ class MarkdownEditor extends HTMLElement {
 }
 
 window.customElements.define("markdown-editor", MarkdownEditor);
+
+export { MarkdownEditor }
