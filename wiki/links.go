@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log"
 	"slices"
 	"strings"
 
@@ -42,7 +43,8 @@ func walkLinks(links []string, n ast.Node) []string {
 type HopsClass struct {
 	dataStore data.DataStore
 
-	aList [][2]data.ID
+	aList  [][2]data.ID
+	titles map[data.ID]string
 }
 
 func NewHopsClass(dataStore data.DataStore) *HopsClass {
@@ -56,6 +58,7 @@ func (c *HopsClass) Load() error {
 	if err != nil {
 		return err
 	}
+	c.titles = map[data.ID]string{}
 	for _, id := range ids {
 		d, err := c.dataStore.GetDataByID(id)
 		if err != nil {
@@ -69,6 +72,11 @@ func (c *HopsClass) Load() error {
 		if pr == nil {
 			continue
 		}
+		c.titles[id], err = pr.Title()
+		if err != nil {
+			return err
+		}
+		log.Printf("title %s", c.titles[id])
 		rc, err := pr.DataRevision.NewReadCloser()
 		if err != nil {
 			return err
@@ -92,13 +100,13 @@ func (c *HopsClass) Load() error {
 }
 
 func (c *HopsClass) AttemptInstance(dr data.DataRevision) (data.Instance, error) {
-	i := HopsInstance{class: c}
+	i := HopsInstance{class: c, title: c.titles[dr.Data().ID()]}
 	for _, pair := range c.aList {
 		if pair[1] == dr.Data().ID() {
-			i.backHop1 = append(i.backHop1, pair[0])
+			i.hop1Back = append(i.hop1Back, pair[0])
 		}
 		if pair[0] == dr.Data().ID() {
-			i.hop1 = append(i.backHop1, pair[1])
+			i.hop1 = append(i.hop1Back, pair[1])
 		}
 	}
 	// sort.Slice(i.hop1, func(j, k int) bool {
@@ -116,7 +124,8 @@ func (c *HopsClass) AttemptInstance(dr data.DataRevision) (data.Instance, error)
 type HopsInstance struct {
 	class    *HopsClass
 	dr       data.DataRevision
-	backHop1 []data.ID
+	title    string
+	hop1Back []data.ID
 	hop1     []data.ID
 	hop2     []data.ID
 }
@@ -125,8 +134,25 @@ func (i *HopsInstance) DataRevision() data.DataRevision {
 	return i.dr
 }
 
+type pageEntry struct {
+	ID    data.ID
+	Title string
+}
+
 func (i *HopsInstance) NewReadCloser() (io.ReadCloser, error) {
-	data := map[string][]data.ID{"-1": i.backHop1, "1": i.hop1, "2": i.hop2}
+	hop1Back := make([]pageEntry, len(i.hop1Back))
+	for j := range i.hop1Back {
+		hop1Back[j] = pageEntry{i.hop1Back[j], i.class.titles[i.hop1Back[j]]}
+	}
+	hop1 := make([]pageEntry, len(i.hop1))
+	for j := range i.hop1 {
+		hop1[j] = pageEntry{i.hop1[j], i.class.titles[i.hop1[j]]}
+	}
+	hop2 := make([]pageEntry, len(i.hop2))
+	for j := range i.hop2 {
+		hop2[j] = pageEntry{i.hop2[j], i.class.titles[i.hop2[j]]}
+	}
+	data := map[string]interface{}{"-1": hop1Back, "1": hop1, "2": hop2, "title": i.title}
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(data)
 	if err != nil {

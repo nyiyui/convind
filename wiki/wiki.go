@@ -1,9 +1,11 @@
 package wiki
 
 import (
+	"bufio"
 	"bytes"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/yuin/goldmark"
 	"inaba.kiyuri.ca/2025/convind/data"
@@ -49,12 +51,31 @@ func (p *Page) LatestRevision() (*PageRevision, error) {
 	return &PageRevision{latestRevision}, nil
 }
 
+func (p *Page) LatestRevisionTitle() (string, error) {
+	pr, err := p.LatestRevision()
+	if err != nil {
+		return "", err
+	}
+	return pr.Title()
+}
+
 type PageRevision struct {
 	DataRevision data.DataRevision
 }
 
 func (p *PageRevision) URL() string {
 	return "convind://" + p.DataRevision.Data().ID().String() + "?revision=" + strconv.FormatUint(p.DataRevision.RevisionID(), 10)
+}
+
+func (p *PageRevision) Title() (string, error) {
+	rc, err := p.DataRevision.NewReadCloser()
+	if err != nil {
+		return "", err
+	}
+	defer rc.Close()
+	s := bufio.NewScanner(rc)
+	s.Scan()
+	return strings.TrimPrefix(s.Text(), "# "), s.Err()
 }
 
 func (p *PageRevision) View() (string, error) {
