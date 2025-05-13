@@ -40,20 +40,20 @@ func walkLinks(links []string, n ast.Node) []string {
 	return links
 }
 
-type HopsClass struct {
+type WikiClass struct {
 	dataStore data.DataStore
 
 	aList  [][2]data.ID
 	titles map[data.ID]string
 }
 
-func NewHopsClass(dataStore data.DataStore) *HopsClass {
-	return &HopsClass{
+func NewWikiClass(dataStore data.DataStore) *WikiClass {
+	return &WikiClass{
 		dataStore: dataStore,
 	}
 }
 
-func (c *HopsClass) Load() error {
+func (c *WikiClass) Load() error {
 	ids, err := c.dataStore.AllIDs()
 	if err != nil {
 		return err
@@ -99,8 +99,8 @@ func (c *HopsClass) Load() error {
 	return nil
 }
 
-func (c *HopsClass) AttemptInstance(dr data.DataRevision) (data.Instance, error) {
-	i := HopsInstance{class: c, title: c.titles[dr.Data().ID()]}
+func (c *WikiClass) AttemptInstance(dr data.DataRevision) (data.Instance, error) {
+	i := WikiInstance{class: c, title: c.titles[dr.Data().ID()]}
 	for _, pair := range c.aList {
 		if pair[1] == dr.Data().ID() {
 			i.hop1Back = append(i.hop1Back, pair[0])
@@ -121,8 +121,8 @@ func (c *HopsClass) AttemptInstance(dr data.DataRevision) (data.Instance, error)
 	return &i, nil
 }
 
-type HopsInstance struct {
-	class    *HopsClass
+type WikiInstance struct {
+	class    *WikiClass
 	dr       data.DataRevision
 	title    string
 	hop1Back []data.ID
@@ -130,7 +130,7 @@ type HopsInstance struct {
 	hop2     []data.ID
 }
 
-func (i *HopsInstance) DataRevision() data.DataRevision {
+func (i *WikiInstance) DataRevision() data.DataRevision {
 	return i.dr
 }
 
@@ -139,7 +139,7 @@ type pageEntry struct {
 	Title string
 }
 
-func (i *HopsInstance) NewReadCloser() (io.ReadCloser, error) {
+func (i *WikiInstance) NewReadCloser() (io.ReadCloser, error) {
 	hop1Back := make([]pageEntry, len(i.hop1Back))
 	for j := range i.hop1Back {
 		hop1Back[j] = pageEntry{i.hop1Back[j], i.class.titles[i.hop1Back[j]]}

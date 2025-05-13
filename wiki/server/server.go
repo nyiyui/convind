@@ -21,14 +21,14 @@ var javascriptFS embed.FS
 type Server struct {
 	mux       *http.ServeMux
 	dataStore data.DataStore
-	hops      *wiki.HopsClass
+	hops      *wiki.WikiClass
 	tps       map[string]*template.Template
 }
 
 func New(dataStore data.DataStore) (*Server, error) {
 	s := new(Server)
 	s.dataStore = dataStore
-	s.hops = wiki.NewHopsClass(s.dataStore)
+	s.hops = wiki.NewWikiClass(s.dataStore)
 	err := s.hops.Load()
 	if err != nil {
 		return nil, err
