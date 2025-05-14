@@ -22,8 +22,8 @@ class PageList extends HTMLElement {
       .then((resp) => resp.json())
       .then((pages) => {
         pages  
-          .filter((page) => page.MIMEType == "text/markdown")
           .filter((page) => page.Revisions.length !== 0)
+          .filter((page) => page.MIMEType === "text/markdown")
           .sort((a, b) => { latestCreationTime(b) - latestCreationTime(a); })
           .forEach((page) => {
             const li = document.createElement("li");

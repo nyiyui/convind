@@ -74,6 +74,12 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprint(err), 500)
 		return
 	}
+	if data.MIMEType() != "text/markdown" {
+		if err != nil {
+			http.Error(w, "MIME type is not text/markdown", 404)
+			return
+		}
+	}
 	page := wiki.Page{data}
 	switch r.Method {
 	case "GET":

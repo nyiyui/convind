@@ -10,12 +10,6 @@ class Page extends HTMLElement {
     this.hop2 = document.createElement("ul");
     this.hop1Back = document.createElement("ul");
     fetch(`/api/v1/page/${id}`)
-      .then((resp) => {
-        if (resp.headers.get("Content-Type") !== "text/markdown") {
-          throw new Error("must be text/markdown")
-        }
-        return resp;
-      })
       .then((resp) => resp.text()).then((text) => this.editor.setValue(text));
     fetch(`/api/v1/page/${id}/hop`).then((resp) => resp.json()).then((data) => {
       data["1"].forEach((page) => {
