@@ -9,13 +9,20 @@ class Page extends HTMLElement {
     this.hop1 = document.createElement("ul");
     this.hop2 = document.createElement("ul");
     this.hop1Back = document.createElement("ul");
-    fetch(`/api/v1/page/${id}`).then((resp) => resp.text()).then((text) => this.editor.setValue(text));
+    fetch(`/api/v1/page/${id}`)
+      .then((resp) => {
+        if (resp.headers.get("Content-Type") !== "text/markdown") {
+          throw new Error("must be text/markdown")
+        }
+        return resp;
+      })
+      .then((resp) => resp.text()).then((text) => this.editor.setValue(text));
     fetch(`/api/v1/page/${id}/hop`).then((resp) => resp.json()).then((data) => {
       data["1"].forEach((page) => {
         if (page.ID == this.id) return;
         const a = document.createElement("a");
         a.href = `/page/${page.ID}`;
-        a.textContent = page.Title;
+        a.textContent = page.Title ? page.Title : page.ID;
         const li = document.createElement("li");
         li.appendChild(a);
         this.hop1.appendChild(li);
@@ -24,7 +31,7 @@ class Page extends HTMLElement {
         if (page.ID == this.id) return;
         const a = document.createElement("a");
         a.href = `/page/${page.ID}`;
-        a.textContent = page.Title;
+        a.textContent = page.Title ? page.Title : page.ID;
         const li = document.createElement("li");
         li.appendChild(a);
         this.hop2.appendChild(li);
@@ -33,7 +40,7 @@ class Page extends HTMLElement {
         if (page.ID == this.id) return;
         const a = document.createElement("a");
         a.href = `/page/${page.ID}`;
-        a.textContent = page.Title;
+        a.textContent = page.Title ? page.Title : page.ID;
         const li = document.createElement("li");
         li.appendChild(a);
         this.hop1Back.appendChild(li);
@@ -51,7 +58,7 @@ class Page extends HTMLElement {
     wrapper.classList.add('wrapper');
     this.editor.id = 'main-editor';
     this.editor.editor.addEventListener('input', async (event) => {
-      const newSource = this.editor.editor.value;
+      const newSource = this.editor.getEditorContent();
       const resp = await fetch(`/api/v1/page/${this.id}`, { method: "POST", body: newSource });
       if (!resp.ok) {
         throw new Error(`resp not ok: ${resp.status}`);

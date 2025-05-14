@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"log"
 	"slices"
 	"strings"
 
@@ -76,7 +75,6 @@ func (c *WikiClass) Load() error {
 		if err != nil {
 			return err
 		}
-		log.Printf("title %s", c.titles[id])
 		rc, err := pr.DataRevision.NewReadCloser()
 		if err != nil {
 			return err

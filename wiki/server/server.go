@@ -55,6 +55,8 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("POST /api/v1/page/{id}", s.handlePage)
 	s.mux.HandleFunc("POST /api/v1/page/new", s.handlePageNew)
 	s.mux.HandleFunc("GET /api/v1/pages", s.handlePageList)
+	s.mux.HandleFunc("POST /api/v1/data/new", s.handleDataNew)
+	s.mux.HandleFunc("GET /api/v1/data/{id}", s.handleData)
 
 	s.mux.HandleFunc("GET /", s.handleSPA)
 }
@@ -176,4 +178,66 @@ func (s *Server) handlePageHop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	io.Copy(w, rc)
+}
+
+func (s *Server) handleDataNew(w http.ResponseWriter, r *http.Request) {
+	mimeType := r.Header.Get("Content-Type")
+	d, err := s.dataStore.New(mimeType)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	dr, err := d.NewRevision(r.Body)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	http.Redirect(w, r, filepath.Join("/api/v1/data", d.ID().String())+"?revision-id="+strconv.FormatUint(dr.RevisionID(), 10), 302)
+}
+
+func (s *Server) handleData(w http.ResponseWriter, r *http.Request) {
+	idRaw := r.PathValue("id")
+	id := new(data.ID)
+	err := id.UnmarshalText([]byte(idRaw))
+	if err != nil {
+		http.Error(w, "invalid id", 404)
+		return
+	}
+	data, err := s.dataStore.GetDataByID(*id)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	dr, err := LatestRevision(data)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	w.Header().Set("Content-Type", data.MIMEType())
+	rc, err := dr.NewReadCloser()
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	_, err = io.Copy(w, rc)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		// probably, the 200 header has already been written, but whatever
+		return
+	}
+}
+
+// LatestRevision returns the latest revision if available, and nil is there are no revisions at all.
+func LatestRevision(d data.Data) (data.DataRevision, error) {
+	revisions, err := d.Revisions()
+	if err != nil {
+		return nil, err
+	}
+	var latestRevision data.DataRevision
+	for _, revision := range revisions {
+		if latestRevision == nil || revision.CreationTime().After(latestRevision.CreationTime()) {
+			latestRevision = revision
+		}
+	}
+	return latestRevision, nil
 }

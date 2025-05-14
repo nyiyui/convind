@@ -11,6 +11,4 @@ Markdown format here means CommonMark with (potentially) a few extensions, such 
 ## TODO
 
 - link auto-completion
-- backlinks
-- 2-hop links
 - list of all pages
