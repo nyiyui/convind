@@ -49,6 +49,9 @@ class MarkdownEditor extends HTMLElement {
     .editor {
       font-family: monospace;
     }
+    .viewer img {
+      max-width: min(100%, max(70%, 512px));
+    }
     /* TODO: where to place editor on tall screens? */
     `;
     shadow.appendChild(style);

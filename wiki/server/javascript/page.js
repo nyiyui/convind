@@ -8,7 +8,6 @@ class Page extends HTMLElement {
     this.hops = document.createElement("div");
     this.hop1 = document.createElement("ul");
     this.hop2 = document.createElement("ul");
-    this.hop1Back = document.createElement("ul");
     this.instancesWrapper = document.createElement("div");
     this.classNames = [];
     fetch(`/api/v1/page/${id}`)
@@ -37,15 +36,6 @@ class Page extends HTMLElement {
         const li = document.createElement("li");
         li.appendChild(a);
         this.hop2.appendChild(li);
-      });
-      data["-1"].forEach((page) => {
-        if (page.ID == this.id) return;
-        const a = document.createElement("a");
-        a.href = `/page/${page.ID}`;
-        a.textContent = page.Title ? page.Title : page.ID;
-        const li = document.createElement("li");
-        li.appendChild(a);
-        this.hop1Back.appendChild(li);
       });
     });
   }
@@ -81,14 +71,8 @@ class Page extends HTMLElement {
     hop2Wrapper.firstChild.textContent = "2 hop";
     hop2Wrapper.appendChild(this.hop2);
 
-    const hop1BackWrapper = document.createElement("div");
-    hop1BackWrapper.appendChild(document.createElement("h2"));
-    hop1BackWrapper.firstChild.textContent = "backlinks";
-    hop1BackWrapper.appendChild(this.hop1Back);
-
     this.hops.appendChild(hop1Wrapper);
     this.hops.appendChild(hop2Wrapper);
-    this.hops.appendChild(hop1BackWrapper);
     wrapper.appendChild(this.instancesWrapper);
     shadow.appendChild(wrapper);
   }

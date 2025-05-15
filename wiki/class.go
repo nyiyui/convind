@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"log"
 	"slices"
 	"strings"
 
@@ -57,6 +58,7 @@ func (c *WikiClass) Name() string {
 }
 
 func (c *WikiClass) Load() error {
+	log.Printf("WikiClass.Load")
 	ids, err := c.dataStore.AllIDs()
 	if err != nil {
 		return err
@@ -66,6 +68,9 @@ func (c *WikiClass) Load() error {
 		d, err := c.dataStore.GetDataByID(id)
 		if err != nil {
 			return err
+		}
+		if d.MIMEType() != "text/markdown" {
+			continue
 		}
 		page := Page{d}
 		pr, err := page.LatestRevision()
@@ -104,32 +109,32 @@ func (c *WikiClass) Load() error {
 func (c *WikiClass) AttemptInstance(dr data.DataRevision) (data.Instance, error) {
 	i := WikiInstance{class: c, title: c.titles[dr.Data().ID()]}
 	for _, pair := range c.aList {
-		if pair[1] == dr.Data().ID() {
-			i.hop1Back = append(i.hop1Back, pair[0])
-		}
 		if pair[0] == dr.Data().ID() {
-			i.hop1 = append(i.hop1Back, pair[1])
+			i.hop1 = append(i.hop1, pair[1])
+		} else if pair[1] == dr.Data().ID() {
+			i.hop1 = append(i.hop1, pair[0])
 		}
 	}
 	// sort.Slice(i.hop1, func(j, k int) bool {
 	// 	return i.hop1[j].String() < i.hop1[k].String()
 	// })
 	for _, pair := range c.aList {
-		if !slices.ContainsFunc(i.hop1, func(a data.ID) bool { return a.String() == pair[0].String() }) {
-			continue
+		if slices.ContainsFunc(i.hop1, func(a data.ID) bool { return a.String() == pair[0].String() }) {
+			i.hop2 = append(i.hop2, pair[1])
 		}
-		i.hop2 = append(i.hop2, pair[1])
+		if slices.ContainsFunc(i.hop1, func(a data.ID) bool { return a.String() == pair[1].String() }) {
+			i.hop2 = append(i.hop2, pair[0])
+		}
 	}
 	return &i, nil
 }
 
 type WikiInstance struct {
-	class    *WikiClass
-	dr       data.DataRevision
-	title    string
-	hop1Back []data.ID
-	hop1     []data.ID
-	hop2     []data.ID
+	class *WikiClass
+	dr    data.DataRevision
+	title string
+	hop1  []data.ID
+	hop2  []data.ID
 }
 
 func (i *WikiInstance) DataRevision() data.DataRevision {
@@ -144,10 +149,6 @@ type pageEntry struct {
 }
 
 func (i *WikiInstance) NewReadCloser() (io.ReadCloser, error) {
-	hop1Back := make([]pageEntry, len(i.hop1Back))
-	for j := range i.hop1Back {
-		hop1Back[j] = pageEntry{i.hop1Back[j], i.class.titles[i.hop1Back[j]]}
-	}
 	hop1 := make([]pageEntry, len(i.hop1))
 	for j := range i.hop1 {
 		hop1[j] = pageEntry{i.hop1[j], i.class.titles[i.hop1[j]]}
@@ -156,7 +157,7 @@ func (i *WikiInstance) NewReadCloser() (io.ReadCloser, error) {
 	for j := range i.hop2 {
 		hop2[j] = pageEntry{i.hop2[j], i.class.titles[i.hop2[j]]}
 	}
-	data := map[string]interface{}{"-1": hop1Back, "1": hop1, "2": hop2, "title": i.title}
+	data := map[string]interface{}{"1": hop1, "2": hop2, "title": i.title}
 	buf := new(bytes.Buffer)
 	err := json.NewEncoder(buf).Encode(data)
 	if err != nil {
