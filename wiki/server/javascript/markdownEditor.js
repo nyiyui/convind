@@ -71,7 +71,6 @@ class MarkdownEditor extends HTMLElement {
     const ol = document.createElement('ol');
     this.editor.appendChild(ol);
     this.source.split('\n').forEach((line) => {
-      console.log('line', line);
       const elem = document.createElement('li');
       elem.textContent = line;
       ol.appendChild(elem);
@@ -89,7 +88,6 @@ class MarkdownEditor extends HTMLElement {
   }
   onChange(event) {
     this.source = this.getEditorContent();
-    console.log(this.source);
     this.render();
   }
   onPaste(event) {
@@ -115,22 +113,21 @@ class MarkdownEditor extends HTMLElement {
           item.getAsString(resolve);
         }));
       }
-      console.log(textToAdd);
       const selection = window.getSelection();
       if (!selection.rangeCount) return;
       selection.deleteFromDocument();
       selection.getRangeAt(0)
         .insertNode(document.createTextNode(textToAdd));
       selection.collapseToEnd();
+      this.onChange(null);
+      this.editor.dispatchEvent(new Event("input"));
     });
     event.preventDefault();
-    this.onChange(null);
   }
   render() {
     const parsed = this.parser.parse(this.source)
     fixCorvindLinks(parsed.walker());
     const result = this.renderer.render(parsed);
-    console.log(result);
     this.viewer.innerHTML = result;
   }
   onClick(event) {
@@ -140,7 +137,6 @@ class MarkdownEditor extends HTMLElement {
     const [startPos, endPos] = sourcepos.split("-");
     const [startLine, startCol] = startPos.split(":").map(parseInt);
     this.editor.firstChild.children[startLine-1].focus();
-    console.log(this.editor.firstChild.children[startLine-1]);
     //this.editor.setSelectionRange(startIndex, endIndex+1);
   }
   onPotentialAutocomplete() {

@@ -53,6 +53,7 @@ class Page extends HTMLElement {
     this.editor.id = 'main-editor';
     this.editor.editor.addEventListener('input', async (event) => {
       const newSource = this.editor.getEditorContent();
+      console.log(newSource);
       const resp = await fetch(`/api/v1/page/${this.id}`, { method: "POST", body: newSource });
       if (!resp.ok) {
         throw new Error(`resp not ok: ${resp.status}`);
