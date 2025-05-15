@@ -119,6 +119,9 @@ type DataRevision interface {
 }
 
 type Class interface {
+	// Name returns a domain-and-path combo uniquely identifying this class.
+	// Example: inaba.kiyuri.ca/2025/convind/wiki
+	Name() string
 	// AttemptInstance returns an instance for the given [DataRevision], if applicable.
 	// If not, an error is returned.
 	AttemptInstance(dr DataRevision) (Instance, error)
@@ -126,6 +129,8 @@ type Class interface {
 
 type Instance interface {
 	DataRevision() DataRevision
+	// MIMEType returns the MIME type of data accessible through [NewReadCloser].
+	MIMEType() string
 	// NewReadCloser returns an [io.ReadCloser] of this instance.
 	NewReadCloser() (io.ReadCloser, error)
 }

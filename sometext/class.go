@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,13 +16,13 @@ import (
 	"inaba.kiyuri.ca/2025/convind/data"
 )
 
-type handlerFunc func(data.DataRevision) ([]string, error)
+type HandlerFunc func(data.DataRevision) ([]string, error)
 
 var errNotMatch = errors.New("does not match")
 
-// makePrefixHandler returns a [handlerFunc] with the commandTemplate given.
+// MakePrefixHandler returns a [handlerFunc] with the commandTemplate given.
 // The command is run with stdin as the file.
-func makePrefixHandler(prefix string, command []string) handlerFunc {
+func MakePrefixHandler(prefix string, command []string) HandlerFunc {
 	return func(dr data.DataRevision) ([]string, error) {
 		if !strings.HasPrefix(dr.Data().MIMEType(), prefix) {
 			return nil, errNotMatch
@@ -30,17 +31,21 @@ func makePrefixHandler(prefix string, command []string) handlerFunc {
 	}
 }
 
+// SometextClass is a customizable class that runs arbitrary commands.
 type SometextClass struct {
+	name string
 	// handlers is the list of handlers to attempt on each [data.DataRevision].
 	// Handlers are attempted first to last; if two handlers match, the first one will be chosen.
-	handlers []handlerFunc
+	handlers []HandlerFunc
 }
 
+func NewSometextClass(name string, handlers []HandlerFunc) *SometextClass {
+	return &SometextClass{name, handlers}
+}
+
+func (s *SometextClass) Name() string { return s.name }
+
 func (s *SometextClass) AttemptInstance(dr data.DataRevision) (data.Instance, error) {
-	mimeType := dr.Data().MIMEType()
-	if strings.HasPrefix(mimeType, "text/") {
-		return &passthroughInstance{dr}, nil
-	}
 	for _, f := range s.handlers {
 		command, err := f(dr)
 		if err != nil {
@@ -59,6 +64,8 @@ type passthroughInstance struct {
 
 func (i *passthroughInstance) DataRevision() data.DataRevision { return i.dr }
 
+func (i *passthroughInstance) MIMEType() string { return i.dr.Data().MIMEType() }
+
 func (i *passthroughInstance) NewReadCloser() (io.ReadCloser, error) {
 	return i.dr.NewReadCloser()
 }
@@ -71,27 +78,41 @@ type commandInstance struct {
 
 func (i *commandInstance) DataRevision() data.DataRevision { return i.dr }
 
+func (i *commandInstance) MIMEType() string { return "text/plain" }
+
 func (i *commandInstance) NewReadCloser() (io.ReadCloser, error) {
 	f, err := os.Open(i.cachePath)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	if err == nil {
 		return f, nil
-	} else if err != nil {
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
+	}
+	f, err = os.Create(i.cachePath)
+	if err != nil {
+		return nil, fmt.Errorf("create cache file: %w", err)
 	}
 	stdin, err := i.dr.NewReadCloser()
 	if err != nil {
+		f.Close()
 		return nil, fmt.Errorf("NewReadCloser: %w", err)
 	}
+	defer stdin.Close()
+	log.Printf("running %v", i.command)
 	cmd := exec.Command(i.command[0], i.command[1:]...)
-	buf := new(bytes.Buffer)
 	cmd.Stdin = stdin
-	cmd.Stdout = buf
-	err = cmd.Start()
+	cmd.Stdout = f
+	err = cmd.Run()
 	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	_, err = f.Seek(0, 0)
+	if err != nil {
+		f.Close()
 		return nil, err
 	}
 	// TODO: nicely handle errors while output is being written?
-	return &buffer{buf}, nil
+	return f, nil
 }
 
 type buffer struct {

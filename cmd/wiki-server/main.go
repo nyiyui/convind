@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"inaba.kiyuri.ca/2025/convind/data"
+	"inaba.kiyuri.ca/2025/convind/sometext"
 	"inaba.kiyuri.ca/2025/convind/wiki/server"
 )
 
@@ -21,6 +22,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	s.AddClass(sometext.NewSometextClass("inaba.kiyuri.ca/2025/convind/cmd/wiki-server/wc", []sometext.HandlerFunc{
+		sometext.MakePrefixHandler("text/", []string{"wc"}),
+	}))
+	s.AddClass(sometext.NewSometextClass("inaba.kiyuri.ca/2025/convind/cmd/wiki-server/file", []sometext.HandlerFunc{
+		sometext.MakePrefixHandler("", []string{"file", "-"}),
+	}))
 	log.Printf("listening on %s…", bind)
 	log.Fatal(http.ListenAndServe(bind, s))
 }

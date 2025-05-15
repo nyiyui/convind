@@ -9,8 +9,16 @@ class Page extends HTMLElement {
     this.hop1 = document.createElement("ul");
     this.hop2 = document.createElement("ul");
     this.hop1Back = document.createElement("ul");
+    this.instancesWrapper = document.createElement("div");
+    this.classNames = [];
     fetch(`/api/v1/page/${id}`)
       .then((resp) => resp.text()).then((text) => this.editor.setValue(text));
+    fetch(`/api/v1/data/${id}/instances`)
+      .then((resp) => resp.json()).then((classNames) => {
+        console.log('classNames', classNames);
+        this.classNames = classNames;
+        this.loadInstances();
+      });
     fetch(`/api/v1/page/${id}/hop`).then((resp) => resp.json()).then((data) => {
       data["1"].forEach((page) => {
         if (page.ID == this.id) return;
@@ -81,7 +89,35 @@ class Page extends HTMLElement {
     this.hops.appendChild(hop1Wrapper);
     this.hops.appendChild(hop2Wrapper);
     this.hops.appendChild(hop1BackWrapper);
+    wrapper.appendChild(this.instancesWrapper);
     shadow.appendChild(wrapper);
+  }
+  async loadInstances() {
+    console.log('this.classNames', this.classNames);
+    let elems = await Promise.all(this.classNames.map(async (className) => {
+      const resp = await fetch(`/api/v1/data/${this.id}/instance/${encodeURIComponent(className)}`);
+      if (!resp.ok) return;
+      if (resp.headers.get("Content-Type").startsWith("text/")) {
+        return { className, elem: document.createTextNode(await resp.text()) }
+      }
+      if (resp.headers.get("Content-Type") === "application/json") {
+        const elem = document.createElement("code");
+        elem.textContent = JSON.stringify(await resp.json(), null, 1);
+        return { className, elem };
+      }
+      return null;
+    }));
+    elems = elems.filter((entry) => !!entry);
+    this.instancesWrapper.textContent = '';
+    elems.forEach(({ className, elem }) => {
+      console.log(elem);
+      const e = document.createElement("div");
+      const h2 = document.createElement("h2");
+      h2.textContent = className;
+      e.appendChild(h2);
+      e.appendChild(elem);
+      this.instancesWrapper.appendChild(e);
+    })
   }
 }
 

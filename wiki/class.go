@@ -52,6 +52,10 @@ func NewWikiClass(dataStore data.DataStore) *WikiClass {
 	}
 }
 
+func (c *WikiClass) Name() string {
+	return "inaba.kiyuri.ca/2025/convind/wiki"
+}
+
 func (c *WikiClass) Load() error {
 	ids, err := c.dataStore.AllIDs()
 	if err != nil {
@@ -131,6 +135,8 @@ type WikiInstance struct {
 func (i *WikiInstance) DataRevision() data.DataRevision {
 	return i.dr
 }
+
+func (i *WikiInstance) MIMEType() string { return "application/json" }
 
 type pageEntry struct {
 	ID    data.ID
