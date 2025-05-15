@@ -20,16 +20,16 @@ class PageList extends HTMLElement {
     const ul = document.createElement("ul");
     fetch('/api/v1/pages')
       .then((resp) => resp.json())
-      .then((pages) => {
-        pages  
-          .filter((page) => page.Revisions.length !== 0)
-          .filter((page) => page.MIMEType === "text/markdown")
-          .sort((a, b) => { latestCreationTime(b) - latestCreationTime(a); })
-          .forEach((page) => {
+      .then((pageEntries) => {
+        pageEntries  
+          .filter((pageEntry) => pageEntry.Data.Revisions.length !== 0)
+          .filter((pageEntry) => pageEntry.Data.MIMEType === "text/markdown")
+          .sort((a, b) => { latestCreationTime(b.Data) - latestCreationTime(a.Data); })
+          .forEach((pageEntry) => {
             const li = document.createElement("li");
             const a = document.createElement("a");
-            a.href = `/page/${page.ID}`;
-            a.textContent = page.ID;
+            a.href = `/page/${pageEntry.Data.ID}`;
+            a.textContent = pageEntry.LatestRevisionTitle;
             li.appendChild(a);
             ul.appendChild(li);
           });

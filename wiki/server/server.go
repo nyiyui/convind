@@ -121,22 +121,33 @@ func (s *Server) handlePageNew(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, filepath.Join("/api/v1/page/", data.ID().String()), 302)
 }
 
+type pageEntry struct {
+	Data                data.Data
+	LatestRevisionTitle string
+}
+
 func (s *Server) handlePageList(w http.ResponseWriter, r *http.Request) {
 	ids, err := s.dataStore.AllIDs()
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
 		return
 	}
-	datas := make([]data.Data, len(ids))
+	entries := make([]pageEntry, len(ids))
 	for i, id := range ids {
-		datas[i], err = s.dataStore.GetDataByID(id)
+		d, err := s.dataStore.GetDataByID(id)
 		if err != nil {
 			http.Error(w, fmt.Sprint(err), 500)
 			return
 		}
+		title, err := (&wiki.Page{d}).LatestRevisionTitle()
+		if err != nil {
+			http.Error(w, fmt.Sprint(err), 500)
+			return
+		}
+		entries[i] = pageEntry{Data: d, LatestRevisionTitle: title}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	err = json.NewEncoder(w).Encode(datas)
+	err = json.NewEncoder(w).Encode(entries)
 	if err != nil {
 		// probably, the 200 header has already been written, but whatever
 		http.Error(w, fmt.Sprint(err), 500)

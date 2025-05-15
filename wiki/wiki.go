@@ -56,6 +56,9 @@ func (p *Page) LatestRevisionTitle() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if pr == nil {
+		return "", nil
+	}
 	return pr.Title()
 }
 
