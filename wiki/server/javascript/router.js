@@ -11,7 +11,7 @@ newPageButton.addEventListener('click', navigateNewPage);
 
 page('/ribbon', showRibbon);
 page('/data/:id', showData);
-page('/data-list', showPageList);
+page('/page-list', showPageList);
 page(showNotFound);
 page();
 

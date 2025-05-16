@@ -201,6 +201,10 @@ func (s *Server) handleData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", data.MIMEType())
+	if dr == nil {
+		w.WriteHeader(204)
+		return
+	}
 	rc, err := dr.NewReadCloser()
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
@@ -248,6 +252,10 @@ func (s *Server) handleDataInstances(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if dr == nil {
+		http.Error(w, "[]", 200)
+		return
+	}
 	availableClassNames := make([]string, 0)
 	for _, class := range s.classes {
 		_, err := class.AttemptInstance(dr)
@@ -284,6 +292,10 @@ func (s *Server) handleDataInstance(w http.ResponseWriter, r *http.Request) {
 	dr, err := getDataRevision(r, data)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	if dr == nil {
+		http.Error(w, "", 204)
 		return
 	}
 	classIndex := slices.IndexFunc(s.classes, classWithName(className))

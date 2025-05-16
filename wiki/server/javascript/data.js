@@ -15,10 +15,21 @@ class Data extends HTMLElement {
   }
   connectedCallback() {
     this.instancesWrapper = document.createElement("div");
+    this.instancesWrapper.classList.add('instances-wrapper');
 
     const shadow = this.attachShadow({mode: "open"});
     const style = document.createElement("style");
     style.textContent = `
+    .wrapper {
+      display: flex;
+      flex-direction: row;
+    }
+    .wrapper > :not(.instances-wrapper) {
+      flex: 2;
+    }
+    .instances-wrapper {
+      flex: 1;
+    }
     `;
     shadow.appendChild(style);
 
@@ -31,6 +42,7 @@ class Data extends HTMLElement {
           if (pattern === mimeType || (pattern.test && pattern.test(mimeType))) {
             this.showElem = make(this.id);
             wrapper.insertBefore(this.showElem, wrapper.firstChild);
+            break;
           }
         }
       })
@@ -50,10 +62,16 @@ class Data extends HTMLElement {
   async loadInstances() {
     console.log('this.classNames', this.classNames);
     let elems = await Promise.all(this.classNames.map(async (className) => {
-      const resp = await fetch(`/api/v1/data/${this.id}/instance/${encodeURIComponent(className)}`);
+      const instanceUrl = `/api/v1/data/${this.id}/instance/${encodeURIComponent(className)}`;
+      const resp = await fetch(instanceUrl);
       if (!resp.ok) return;
       if (className === "inaba.kiyuri.ca/2025/convind/wiki") {
         return { className, elem: this.loadWikiInstance(await resp.json()) };
+      }
+      if (resp.headers.get("Content-Type").startsWith("image/")) {
+        const img = document.createElement('img');
+        img.src = instanceUrl;
+        return { className, elem: img }
       }
       if (resp.headers.get("Content-Type").startsWith("text/")) {
         return { className, elem: document.createTextNode(await resp.text()) }
@@ -95,19 +113,21 @@ class Data extends HTMLElement {
     hops.appendChild(hop1Wrapper);
     hops.appendChild(hop2Wrapper);
 
-    data["1"].forEach((page) => {
+    const markdownOnly = (page) => page.MIMEType === 'text/markdown';
+    data["1"].filter(markdownOnly).forEach((page) => {
       if (page.ID == this.id) return;
       const a = document.createElement("a");
-      a.href = `/page/${page.ID}`;
+      a.href = `/data/${page.ID}`;
       a.textContent = page.Title ? page.Title : page.ID;
       const li = document.createElement("li");
       li.appendChild(a);
       hop1.appendChild(li);
     });
-    data["2"].forEach((page) => {
+    data["2"].filter(markdownOnly).forEach((page) => {
       if (page.ID == this.id) return;
       const a = document.createElement("a");
-      a.href = `/page/${page.ID}`;
+      console.log('page', page);
+      a.href = `/data/${page.ID}`;
       a.textContent = page.Title ? page.Title : page.ID;
       const li = document.createElement("li");
       li.appendChild(a);

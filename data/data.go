@@ -124,6 +124,7 @@ type Class interface {
 	Name() string
 	// AttemptInstance returns an instance for the given [DataRevision], if applicable.
 	// If not, an error is returned.
+	// dr must not be nil.
 	AttemptInstance(dr DataRevision) (Instance, error)
 }
 

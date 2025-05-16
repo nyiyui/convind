@@ -36,11 +36,12 @@ type SometextClass struct {
 	name string
 	// handlers is the list of handlers to attempt on each [data.DataRevision].
 	// Handlers are attempted first to last; if two handlers match, the first one will be chosen.
-	handlers []HandlerFunc
+	handlers       []HandlerFunc
+	outputMIMEType string
 }
 
-func NewSometextClass(name string, handlers []HandlerFunc) *SometextClass {
-	return &SometextClass{name, handlers}
+func NewSometextClass(name string, handlers []HandlerFunc, mimeType string) *SometextClass {
+	return &SometextClass{name, handlers, mimeType}
 }
 
 func (s *SometextClass) Name() string { return s.name }
@@ -53,7 +54,7 @@ func (s *SometextClass) AttemptInstance(dr data.DataRevision) (data.Instance, er
 		}
 		// cachePath just has to be a function of DataRevision and the instance or command
 		cachePath := filepath.Join(os.TempDir(), dr.Data().ID().String()+strconv.FormatUint(dr.RevisionID(), 10)+base64.URLEncoding.EncodeToString([]byte(fmt.Sprint(command))))
-		return &commandInstance{dr, command, cachePath}, nil
+		return &commandInstance{dr, s, command, cachePath}, nil
 	}
 	return nil, errors.New("no matched handlers")
 }
@@ -72,13 +73,19 @@ func (i *passthroughInstance) NewReadCloser() (io.ReadCloser, error) {
 
 type commandInstance struct {
 	dr        data.DataRevision
+	c         *SometextClass
 	command   []string
 	cachePath string
 }
 
 func (i *commandInstance) DataRevision() data.DataRevision { return i.dr }
 
-func (i *commandInstance) MIMEType() string { return "text/plain" }
+func (i *commandInstance) MIMEType() string {
+	if i.c.outputMIMEType == "PASSTHROUGH" {
+		return i.dr.Data().MIMEType()
+	}
+	return i.c.outputMIMEType
+}
 
 func (i *commandInstance) NewReadCloser() (io.ReadCloser, error) {
 	f, err := os.Open(i.cachePath)

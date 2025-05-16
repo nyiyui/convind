@@ -46,8 +46,9 @@ func walkLinks(links []string, n ast.Node) []string {
 type WikiClass struct {
 	dataStore data.DataStore
 
-	aList  [][2]data.ID
-	titles map[data.ID]string
+	aList     [][2]data.ID
+	titles    map[data.ID]string
+	mimeTypes map[data.ID]string
 }
 
 func NewWikiClass(dataStore data.DataStore) *WikiClass {
@@ -67,11 +68,13 @@ func (c *WikiClass) Load() error {
 		return err
 	}
 	c.titles = map[data.ID]string{}
+	c.mimeTypes = map[data.ID]string{}
 	for _, id := range ids {
 		d, err := c.dataStore.GetDataByID(id)
 		if err != nil {
 			return err
 		}
+		c.mimeTypes[id] = d.MIMEType()
 		if d.MIMEType() != "text/markdown" {
 			continue
 		}
@@ -95,7 +98,6 @@ func (c *WikiClass) Load() error {
 		if err != nil {
 			return err
 		}
-		log.Printf("links from %s: %v", c.titles[id], links)
 		for _, link := range links {
 			if strings.HasPrefix(link, "convind://") {
 				id2, err := data.ParseID(link[10:])
@@ -154,18 +156,19 @@ func (i *WikiInstance) DataRevision() data.DataRevision {
 func (i *WikiInstance) MIMEType() string { return "application/json" }
 
 type pageEntry struct {
-	ID    data.ID
-	Title string
+	ID       data.ID
+	Title    string
+	MIMEType string
 }
 
 func (i *WikiInstance) NewReadCloser() (io.ReadCloser, error) {
 	hop1 := make([]pageEntry, len(i.hop1))
 	for j := range i.hop1 {
-		hop1[j] = pageEntry{i.hop1[j], i.class.titles[i.hop1[j]]}
+		hop1[j] = pageEntry{i.hop1[j], i.class.titles[i.hop1[j]], i.class.mimeTypes[i.hop1[j]]}
 	}
 	hop2 := make([]pageEntry, len(i.hop2))
 	for j := range i.hop2 {
-		hop2[j] = pageEntry{i.hop2[j], i.class.titles[i.hop2[j]]}
+		hop2[j] = pageEntry{i.hop2[j], i.class.titles[i.hop2[j]], i.class.mimeTypes[i.hop2[j]]}
 	}
 	data := map[string]interface{}{"1": hop1, "2": hop2, "title": i.title}
 	buf := new(bytes.Buffer)

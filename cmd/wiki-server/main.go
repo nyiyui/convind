@@ -24,10 +24,16 @@ func main() {
 	}
 	s.AddClass(sometext.NewSometextClass("inaba.kiyuri.ca/2025/convind/cmd/wiki-server/wc", []sometext.HandlerFunc{
 		sometext.MakePrefixHandler("text/", []string{"wc"}),
-	}))
+	}, "text/plain"))
 	s.AddClass(sometext.NewSometextClass("inaba.kiyuri.ca/2025/convind/cmd/wiki-server/file", []sometext.HandlerFunc{
 		sometext.MakePrefixHandler("", []string{"file", "-"}),
-	}))
+	}, "text/plain"))
+	s.AddClass(sometext.NewSometextClass("inaba.kiyuri.ca/2025/convind/cmd/wiki-server/tesseract", []sometext.HandlerFunc{
+		sometext.MakePrefixHandler("image/", []string{"tesseract", "-l", "jpn+eng", "-", "-"}),
+	}, "text/plain"))
+	s.AddClass(sometext.NewSometextClass("inaba.kiyuri.ca/2025/convind/cmd/wiki-server/thumb", []sometext.HandlerFunc{
+		sometext.MakePrefixHandler("image/", []string{"magick", "-", "-thumbnail", "256x256", "-"}),
+	}, "PASSTHROUGH"))
 	log.Printf("listening on %s…", bind)
 	log.Fatal(http.ListenAndServe(bind, s))
 }

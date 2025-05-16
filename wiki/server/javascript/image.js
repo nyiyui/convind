@@ -17,7 +17,7 @@ class Image extends HTMLElement {
     const wrapper = document.createElement("div");
     wrapper.classList.add('wrapper');
     const e = document.createElement('img');
-    e.src = `/api/v1/page/${this.id}`;
+    e.src = `/api/v1/data/${this.id}`;
     wrapper.appendChild(e);
     shadow.appendChild(wrapper);
   }

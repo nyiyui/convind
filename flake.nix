@@ -21,6 +21,7 @@
           packages = with pkgs; [
             nodejs_23
             inotify-tools
+            tesseract
           ];
         };
       }
