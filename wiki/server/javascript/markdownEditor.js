@@ -16,7 +16,7 @@ function fixCorvindLinks(walker) {
     const { node } = entry;
     if (node.type == "link") {
       if (node.destination.startsWith("convind://")) {
-        node.destination = "/page/" + node.destination.slice(10)
+        node.destination = "/data/" + node.destination.slice(10)
       }
     }
   }

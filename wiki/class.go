@@ -31,6 +31,9 @@ func walkLinks(links []string, n ast.Node) []string {
 	case *ast.Link:
 		dest := n.Destination
 		links = append(links, string(dest))
+	case *ast.Image:
+		dest := n.Destination
+		links = append(links, string(dest))
 	}
 	if n.HasChildren() {
 		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
@@ -92,21 +95,28 @@ func (c *WikiClass) Load() error {
 		if err != nil {
 			return err
 		}
+		log.Printf("links from %s: %v", c.titles[id], links)
 		for _, link := range links {
-			if !strings.HasPrefix(link, "convind://") {
-				continue
+			if strings.HasPrefix(link, "convind://") {
+				id2, err := data.ParseID(link[10:])
+				if err != nil {
+					continue
+				}
+				c.aList = append(c.aList, [2]data.ID{id, id2})
+			} else if strings.HasPrefix(link, "/api/v1/data/") {
+				id2, err := data.ParseID(link[13:])
+				if err != nil {
+					continue
+				}
+				c.aList = append(c.aList, [2]data.ID{id, id2})
 			}
-			id2, err := data.ParseID(link[10:])
-			if err != nil {
-				continue
-			}
-			c.aList = append(c.aList, [2]data.ID{id, id2})
 		}
 	}
 	return nil
 }
 
 func (c *WikiClass) AttemptInstance(dr data.DataRevision) (data.Instance, error) {
+	// non text/markdown files may be linked to
 	i := WikiInstance{class: c, title: c.titles[dr.Data().ID()]}
 	for _, pair := range c.aList {
 		if pair[0] == dr.Data().ID() {

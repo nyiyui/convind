@@ -28,7 +28,7 @@ class PageList extends HTMLElement {
           .forEach((pageEntry) => {
             const li = document.createElement("li");
             const a = document.createElement("a");
-            a.href = `/page/${pageEntry.Data.ID}`;
+            a.href = `/data/${pageEntry.Data.ID}`;
             a.textContent = pageEntry.LatestRevisionTitle;
             li.appendChild(a);
             ul.appendChild(li);

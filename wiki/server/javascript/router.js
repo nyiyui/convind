@@ -1,7 +1,7 @@
 import page from 'page';
 import { navigateNewPage } from './wiki.js';
 import { Ribbon } from './ribbon.js';
-import { Page } from './page.js';
+import { Data } from './data.js';
 import { PageList } from './page-list.js';
 
 const main = document.querySelector('body > main');
@@ -10,8 +10,8 @@ const newPageButton = document.getElementById('button-page-new');
 newPageButton.addEventListener('click', navigateNewPage);
 
 page('/ribbon', showRibbon);
-page('/page/:id', showPage);
-page('/page-list', showPageList);
+page('/data/:id', showData);
+page('/data-list', showPageList);
 page(showNotFound);
 page();
 
@@ -22,11 +22,11 @@ function showRibbon(ctx, next) {
   main.appendChild(new Ribbon(params.getAll("id")));
 }
 
-function showPage(ctx, next) {
+function showData(ctx, next) {
   main.textContent = '';
 
   const id = ctx.params.id;
-  main.appendChild(new Page(id));
+  main.appendChild(new Data(id));
 }
 
 function showPageList(ctx, next) {

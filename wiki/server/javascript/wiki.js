@@ -10,7 +10,7 @@ async function navigateNewPage() {
     throw new Error("should be redirected");
   }
   const id = (new URL(resp.url)).pathname.split('/').slice(-1);
-  page(`/page/${id}`);
+  page(`/data/${id}`);
 }
 
 export { navigateNewPage };
