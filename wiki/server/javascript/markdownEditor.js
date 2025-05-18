@@ -66,6 +66,10 @@ class MarkdownEditor extends HTMLElement {
     .viewer img {
       max-width: min(100%, max(70%, 512px));
     }
+    .viewer blockquote {
+      border-left: 2px solid aquamarine;
+      padding-left: 1em;
+    }
     `;
     shadow.appendChild(style);
 
