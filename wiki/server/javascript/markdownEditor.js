@@ -41,18 +41,26 @@ class MarkdownEditor extends HTMLElement {
     style.textContent = `
     .wrapper {
       display: flex;
+      height: 100vh;
+      position: relative;
     }
-    .viewer, .editor {
+    .viewer {
       flex: 1;
-      overflow: scroll;
+      overflow: auto;
+      padding-right: 1rem;
     }
     .editor {
+      position: sticky;
+      top: 0;
+      flex: 1;
+      height: 100vh;
+      overflow: auto;
       font-family: monospace;
+      box-shadow: -2px 0 5px rgba(0,0,0,0.1);
     }
     .viewer img {
       max-width: min(100%, max(70%, 512px));
     }
-    /* TODO: where to place editor on tall screens? */
     `;
     shadow.appendChild(style);
 
@@ -94,6 +102,9 @@ class MarkdownEditor extends HTMLElement {
   onChange(event) {
     this.source = this.getEditorContent();
     this.render();
+    
+    // Trigger onEditorClick to find and scroll to the corresponding element in the viewer
+    this.onEditorClick(event);
   }
   onPaste(event) {
     // Process only file items (direct files, not HTML)
