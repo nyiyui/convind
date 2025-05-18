@@ -66,6 +66,8 @@ class MarkdownEditor extends HTMLElement {
     this.refreshEditorContent();
     this.editor.addEventListener("input", this.onChange.bind(this));
     this.editor.addEventListener("paste", this.onPaste.bind(this));
+    this.editor.addEventListener("click", this.onEditorClick.bind(this));
+    this.editor.addEventListener("keyup", this.onEditorClick.bind(this));
     wrapper.appendChild(this.editor);
     shadow.appendChild(wrapper);
   }
@@ -195,6 +197,61 @@ class MarkdownEditor extends HTMLElement {
     const [startLine, startCol] = startPos.split(":").map(parseInt);
     this.editor.firstChild.children[startLine-1].focus();
     //this.editor.setSelectionRange(startIndex, endIndex+1);
+  }
+  onEditorClick(event) {
+    // Get the current line number in the editor
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    // Find which list item contains the cursor
+    let currentNode = selection.anchorNode;
+    
+    // Navigate up to find the LI element
+    while (currentNode && currentNode.nodeName !== 'LI') {
+      currentNode = currentNode.parentNode;
+    }
+    
+    if (!currentNode) return;
+    
+    // Get the line number (zero-based index in the OL)
+    const lineNumber = Array.from(currentNode.parentNode.children).indexOf(currentNode) + 1;
+    
+    // Find an element in the viewer with a sourcepos attribute starting with this line number
+    const sourceposPattern = `${lineNumber}:`;
+    
+    // Look for elements with matching sourcepos in the viewer
+    const elements = Array.from(this.viewer.querySelectorAll('[data-sourcepos]'));
+    
+    // Find elements whose sourcepos starts with our line number
+    const matchingElements = elements.filter(el => {
+      const sourcepos = el.dataset.sourcepos;
+      if (!sourcepos) return false;
+      
+      const [startPos, _] = sourcepos.split('-');
+      return startPos.startsWith(sourceposPattern);
+    });
+    
+    // If we found a matching element, scroll to it
+    if (matchingElements.length > 0) {
+      // Sort by specificity (most specific match first)
+      matchingElements.sort((a, b) => {
+        const aPos = a.dataset.sourcepos.split('-')[0];
+        const bPos = b.dataset.sourcepos.split('-')[0];
+        return bPos.length - aPos.length;
+      });
+      
+      const targetElement = matchingElements[0];
+      this.scrollElementIntoView(targetElement);
+    }
+  }
+  scrollElementIntoView(element) {
+    if (!element) return;
+    
+    // Scroll the element into view with smooth behavior
+    element.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
   }
   onPotentialAutocomplete() {
     const selection = window.getSelection();
