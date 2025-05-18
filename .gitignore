@@ -1,3 +1,4 @@
 .direnv
 .envrc
 sample-store
+/wiki-server
