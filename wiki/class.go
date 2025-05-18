@@ -14,41 +14,161 @@ import (
 	"inaba.kiyuri.ca/2025/convind/data"
 )
 
-func getLinks(source io.Reader) ([]string, error) {
+func getLinks(source io.Reader) ([]link, error) {
 	text_, err := io.ReadAll(source)
 	if err != nil {
 		return nil, err
 	}
 	p := goldmark.DefaultParser()
 	n := p.Parse(text.NewReader(text_))
-	links := make([]string, 0)
-	links = walkLinks(links, n)
+	links := make([]link, 0)
+	links = walkLinks(links, n, text_)
 	return links, nil
 }
 
-func walkLinks(links []string, n ast.Node) []string {
+type link struct {
+	Destination string
+	// Content is the text surrounding the link itself.
+	Context string
+}
+
+func walkLinks(links []link, n ast.Node, source []byte) []link {
 	switch n := n.(type) {
 	case *ast.Link:
 		dest := n.Destination
-		links = append(links, string(dest))
+		context := getTextContent(n, source)
+		links = append(links, link{
+			Destination: string(dest),
+			Context:     context,
+		})
 	case *ast.Image:
 		dest := n.Destination
-		links = append(links, string(dest))
+		context := getTextContent(n, source)
+		links = append(links, link{
+			Destination: string(dest),
+			Context:     context,
+		})
 	}
 	if n.HasChildren() {
 		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
-			links = walkLinks(links, c)
+			links = walkLinks(links, c, source)
 		}
 	}
 	return links
 }
 
+// Helper function to extract text content from a node
+func getTextContent(n ast.Node, source []byte) string {
+	if n == nil {
+		return ""
+	}
+
+	// Build context from surrounding text
+	var context strings.Builder
+	
+	// Get the parent node to find siblings
+	parent := n.Parent()
+	if parent == nil {
+		// If no parent, just get the node's own text
+		return extractNodeText(n, source)
+	}
+	
+	// Find the current node among its siblings
+	var prevSibling, nextSibling ast.Node
+	var foundCurrent bool
+	
+	// Traverse siblings to find current node, previous, and next
+	for child := parent.FirstChild(); child != nil; child = child.NextSibling() {
+		if child == n {
+			foundCurrent = true
+		} else if !foundCurrent {
+			prevSibling = child // This will be the last sibling before current
+		} else if foundCurrent && nextSibling == nil {
+			nextSibling = child // This will be the first sibling after current
+			break
+		}
+	}
+	
+	// Extract text from previous sibling (if exists)
+	if prevSibling != nil {
+		prevText := truncateText(extractNodeText(prevSibling, source), 30)
+		if prevText != "" {
+			context.WriteString(prevText)
+			context.WriteString(" … ")
+		}
+	}
+	
+	// Extract text from current node
+	nodeText := extractNodeText(n, source)
+	context.WriteString(nodeText)
+	
+	// Extract text from next sibling (if exists)
+	if nextSibling != nil {
+		nextText := truncateText(extractNodeText(nextSibling, source), 30)
+		if nextText != "" {
+			context.WriteString(" … ")
+			context.WriteString(nextText)
+		}
+	}
+	
+	return context.String()
+}
+
+// Helper function to extract text directly from a node
+func extractNodeText(n ast.Node, source []byte) string {
+	if n == nil {
+		return ""
+	}
+	
+	var sb strings.Builder
+	
+	// If it's a text node, extract its content
+	if text, ok := n.(*ast.Text); ok {
+		if text.Segment.Start < len(source) && text.Segment.Stop <= len(source) && text.Segment.Start < text.Segment.Stop {
+			sb.Write(text.Segment.Value(source))
+		}
+		return sb.String()
+	}
+	
+	// Otherwise recursively extract text from children
+	if n.HasChildren() {
+		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
+			if text, ok := c.(*ast.Text); ok {
+				if text.Segment.Start < len(source) && text.Segment.Stop <= len(source) && text.Segment.Start < text.Segment.Stop {
+					sb.Write(text.Segment.Value(source))
+				}
+			} else {
+				sb.WriteString(extractNodeText(c, source))
+			}
+		}
+	}
+	
+	return sb.String()
+}
+
+// Truncate text to a maximum length
+func truncateText(text string, maxLength int) string {
+	text = strings.TrimSpace(text)
+	if len(text) <= maxLength {
+		return text
+	}
+	
+	// For very long texts, take the last part which is likely more relevant to the link
+	return text[len(text)-maxLength:]
+}
+
 type WikiClass struct {
 	dataStore data.DataStore
 
-	aList     [][2]data.ID
+	aList     []wikiEdge
 	titles    map[data.ID]string
 	mimeTypes map[data.ID]string
+}
+
+type wikiEdge struct {
+	Src        data.ID
+	Dst        data.ID
+	SrcContext string
 }
 
 func NewWikiClass(dataStore data.DataStore) *WikiClass {
@@ -99,18 +219,26 @@ func (c *WikiClass) Load() error {
 			return err
 		}
 		for _, link := range links {
-			if strings.HasPrefix(link, "convind://") {
-				id2, err := data.ParseID(link[10:])
+			if strings.HasPrefix(link.Destination, "convind://") {
+				id2, err := data.ParseID(link.Destination[10:])
 				if err != nil {
 					continue
 				}
-				c.aList = append(c.aList, [2]data.ID{id, id2})
-			} else if strings.HasPrefix(link, "/api/v1/data/") {
-				id2, err := data.ParseID(link[13:])
+				c.aList = append(c.aList, wikiEdge{
+					Src:        id,
+					Dst:        id2,
+					SrcContext: link.Context,
+				})
+			} else if strings.HasPrefix(link.Destination, "/api/v1/data/") {
+				id2, err := data.ParseID(link.Destination[13:])
 				if err != nil {
 					continue
 				}
-				c.aList = append(c.aList, [2]data.ID{id, id2})
+				c.aList = append(c.aList, wikiEdge{
+					Src:        id,
+					Dst:        id2,
+					SrcContext: link.Context,
+				})
 			}
 		}
 	}
@@ -120,22 +248,22 @@ func (c *WikiClass) Load() error {
 func (c *WikiClass) AttemptInstance(dr data.DataRevision) (data.Instance, error) {
 	// non text/markdown files may be linked to
 	i := WikiInstance{class: c, title: c.titles[dr.Data().ID()]}
-	for _, pair := range c.aList {
-		if pair[0] == dr.Data().ID() {
-			i.hop1 = append(i.hop1, pair[1])
-		} else if pair[1] == dr.Data().ID() {
-			i.hop1 = append(i.hop1, pair[0])
+	for _, edge := range c.aList {
+		if edge.Src == dr.Data().ID() {
+			i.hop1 = append(i.hop1, hopWithContext{edge.Dst, ""})
+		} else if edge.Dst == dr.Data().ID() {
+			i.hop1 = append(i.hop1, hopWithContext{edge.Src, edge.SrcContext})
 		}
 	}
 	// sort.Slice(i.hop1, func(j, k int) bool {
 	// 	return i.hop1[j].String() < i.hop1[k].String()
 	// })
-	for _, pair := range c.aList {
-		if slices.ContainsFunc(i.hop1, func(a data.ID) bool { return a.String() == pair[0].String() }) {
-			i.hop2 = append(i.hop2, pair[1])
+	for _, edge := range c.aList {
+		if slices.ContainsFunc(i.hop1, func(h hopWithContext) bool { return h.ID.String() == edge.Src.String() }) {
+			i.hop2 = append(i.hop2, edge.Dst)
 		}
-		if slices.ContainsFunc(i.hop1, func(a data.ID) bool { return a.String() == pair[1].String() }) {
-			i.hop2 = append(i.hop2, pair[0])
+		if slices.ContainsFunc(i.hop1, func(h hopWithContext) bool { return h.ID.String() == edge.Dst.String() }) {
+			i.hop2 = append(i.hop2, edge.Src)
 		}
 	}
 	return &i, nil
@@ -145,8 +273,13 @@ type WikiInstance struct {
 	class *WikiClass
 	dr    data.DataRevision
 	title string
-	hop1  []data.ID
+	hop1  []hopWithContext
 	hop2  []data.ID
+}
+
+type hopWithContext struct {
+	data.ID
+	Context string
 }
 
 func (i *WikiInstance) DataRevision() data.DataRevision {
@@ -158,17 +291,18 @@ func (i *WikiInstance) MIMEType() string { return "application/json" }
 type pageEntry struct {
 	ID       data.ID
 	Title    string
+	Context  string
 	MIMEType string
 }
 
 func (i *WikiInstance) NewReadCloser() (io.ReadCloser, error) {
 	hop1 := make([]pageEntry, len(i.hop1))
 	for j := range i.hop1 {
-		hop1[j] = pageEntry{i.hop1[j], i.class.titles[i.hop1[j]], i.class.mimeTypes[i.hop1[j]]}
+		hop1[j] = pageEntry{ID: i.hop1[j].ID, Title: i.class.titles[i.hop1[j].ID], Context: i.hop1[j].Context, MIMEType: i.class.mimeTypes[i.hop1[j].ID]}
 	}
 	hop2 := make([]pageEntry, len(i.hop2))
 	for j := range i.hop2 {
-		hop2[j] = pageEntry{i.hop2[j], i.class.titles[i.hop2[j]], i.class.mimeTypes[i.hop2[j]]}
+		hop2[j] = pageEntry{ID: i.hop2[j], Title: i.class.titles[i.hop2[j]], MIMEType: i.class.mimeTypes[i.hop2[j]]}
 	}
 	data := map[string]interface{}{"1": hop1, "2": hop2, "title": i.title}
 	buf := new(bytes.Buffer)
