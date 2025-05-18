@@ -144,8 +144,10 @@ class Data extends HTMLElement {
       const a = document.createElement("a");
       a.href = `/data/${page.ID}`;
       a.textContent = page.Title ? page.Title : page.ID;
+      const context = document.createTextNode(" " +page.Context);
       const li = document.createElement("li");
       li.appendChild(a);
+      li.appendChild(context);
       hop1.appendChild(li);
     });
     data["2"].filter(markdownOnly).forEach((page) => {
