@@ -199,6 +199,32 @@ class MarkdownEditor extends HTMLElement {
     fixCorvindLinks(parsed.walker());
     const result = this.renderer.render(parsed);
     this.viewer.innerHTML = result;
+    
+    // Add links around images that point to /data/<id>
+    this.wrapImagesWithLinks();
+  }
+  
+  wrapImagesWithLinks() {
+    // Find all images in the viewer that have src starting with /api/v1/data/
+    const images = Array.from(this.viewer.querySelectorAll('img[src^="/api/v1/data/"]'));
+    
+    // Process each image
+    images.forEach(img => {
+      const src = img.getAttribute('src');
+      const id = src.split('/').pop(); // Get the ID from the end of the URL
+      
+      // Only process images that aren't already wrapped in a link
+      if (img.parentNode.tagName !== 'A') {
+        // Create a link element that points to the data
+        const link = document.createElement('a');
+        link.href = `/data/${id}`;
+        link.target = '_blank'; // Open in new tab
+        
+        // Replace the image with the link containing the image
+        img.parentNode.insertBefore(link, img);
+        link.appendChild(img);
+      }
+    });
   }
   onClick(event) {
     if (event.target == "A") return;
