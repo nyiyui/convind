@@ -55,7 +55,13 @@ func (s *Server) setupRoutes() {
 	if err != nil {
 		panic(err)
 	}
-	s.mux.Handle("GET /static/js/", http.StripPrefix("/static/js/", http.FileServer(http.FS(javascriptFS2))))
+	jsFileServer := http.FileServer(http.FS(javascriptFS2))
+	// Add cache headers for static JS files
+	jsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=86400") // Cache for 1 day
+		jsFileServer.ServeHTTP(w, r)
+	})
+	s.mux.Handle("GET /static/js/", http.StripPrefix("/static/js/", jsHandler))
 
 	s.mux.HandleFunc("GET /api/v1/page/{id}", s.handlePage)
 	s.mux.HandleFunc("POST /api/v1/page/{id}", s.handlePage)
@@ -101,8 +107,26 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "", 204)
 			return
 		}
+		
+		// Add ETag based on revision ID
+		etag := fmt.Sprintf("\"%d\"", pr.DataRevision.RevisionID())
+		w.Header().Set("ETag", etag)
 		w.Header().Set("Revision-ID", strconv.FormatUint(pr.DataRevision.RevisionID(), 10))
+		
+		// Check If-None-Match header for 304 Not Modified response
+		if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		
+		// Set cache control - allow client cache but revalidate
+		w.Header().Set("Cache-Control", "public, must-revalidate, max-age=60") // Cache for a minute, then revalidate
+		
 		rc, err := pr.DataRevision.NewReadCloser()
+		if err != nil {
+			http.Error(w, fmt.Sprint(err), 500)
+			return
+		}
 		defer rc.Close()
 		_, err = io.Copy(w, rc)
 		if err != nil {
@@ -117,6 +141,8 @@ func (s *Server) handlePage(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Revision-ID", strconv.FormatUint(dr.RevisionID(), 10))
+		// No caching for POST responses
+		w.Header().Set("Cache-Control", "no-store") 
 		http.Error(w, "", 204)
 	}
 }
@@ -142,6 +168,10 @@ func (s *Server) handlePageList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	entries := make([]pageEntry, len(ids))
+	
+	// For ETag generation, we'll use a combined string of all revision IDs
+	var etagParts []string
+	
 	for i, id := range ids {
 		d, err := s.dataStore.GetDataByID(id)
 		if err != nil {
@@ -154,8 +184,31 @@ func (s *Server) handlePageList(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		entries[i] = pageEntry{Data: d, LatestRevisionTitle: title}
+		
+		// Add to ETag data
+		rev, err := LatestRevision(d)
+		if err == nil && rev != nil {
+			etagParts = append(etagParts, strconv.FormatUint(rev.RevisionID(), 10))
+		}
 	}
+	
+	// Generate ETag from all revision IDs
+	etag := fmt.Sprintf("\"%s\"", strconv.FormatUint(uint64(len(ids)), 10))
+	if len(etagParts) > 0 {
+		etag = fmt.Sprintf("\"%s\"", strconv.Itoa(len(etagParts)))
+	}
+	w.Header().Set("ETag", etag)
+	
+	// Check If-None-Match header
+	if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	
+	// Set cache headers - shorter max-age since this is a list that could change frequently
+	w.Header().Set("Cache-Control", "public, must-revalidate, max-age=30") // Cache for 30 seconds, then revalidate
 	w.Header().Set("Content-Type", "application/json")
+	
 	err = json.NewEncoder(w).Encode(entries)
 	if err != nil {
 		// probably, the 200 header has already been written, but whatever
@@ -165,6 +218,10 @@ func (s *Server) handlePageList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSPA(w http.ResponseWriter, r *http.Request) {
+	// Set cache headers for SPA - allow client cache but revalidate frequently
+	// We use a short cache time because the SPA itself might change
+	w.Header().Set("Cache-Control", "public, must-revalidate, max-age=300") // Cache for 5 minutes, then revalidate
+	
 	s.renderTemplate("spa.html", w, r, map[string]interface{}{})
 }
 
@@ -202,6 +259,22 @@ func (s *Server) handleData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", data.MIMEType())
+	
+	// Add ETag based on revision ID if one exists
+	if dr != nil {
+		etag := fmt.Sprintf("\"%d\"", dr.RevisionID())
+		w.Header().Set("ETag", etag)
+		
+		// Check If-None-Match header to respond with 304 Not Modified when appropriate
+		if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		
+		// Set cache control - allow client cache but revalidate
+		w.Header().Set("Cache-Control", "public, must-revalidate, max-age=60") // Cache for a minute, then revalidate
+	}
+	
 	if dr == nil {
 		w.WriteHeader(204)
 		return
@@ -211,6 +284,7 @@ func (s *Server) handleData(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprint(err), 500)
 		return
 	}
+	defer rc.Close()
 	_, err = io.Copy(w, rc)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
@@ -252,7 +326,24 @@ func (s *Server) handleDataInstances(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprint(err), 500)
 		return
 	}
+	
 	w.Header().Set("Content-Type", "application/json")
+	
+	// Add ETag based on revision ID if one exists
+	if dr != nil {
+		etag := fmt.Sprintf("\"%d\"", dr.RevisionID())
+		w.Header().Set("ETag", etag)
+		
+		// Check If-None-Match header
+		if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
+		
+		// Set cache control - allow client cache but revalidate
+		w.Header().Set("Cache-Control", "public, must-revalidate, max-age=60") // Cache for a minute, then revalidate
+	}
+	
 	if dr == nil {
 		http.Error(w, "[]", 200)
 		return
@@ -299,6 +390,20 @@ func (s *Server) handleDataInstance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "", 204)
 		return
 	}
+	
+	// Add ETag based on revision ID
+	etag := fmt.Sprintf("\"%s-%d\"", className, dr.RevisionID())
+	w.Header().Set("ETag", etag)
+	
+	// Check If-None-Match header
+	if match := r.Header.Get("If-None-Match"); match != "" && match == etag {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	
+	// Set cache control - allow client cache but revalidate
+	w.Header().Set("Cache-Control", "public, must-revalidate, max-age=60") // Cache for a minute, then revalidate
+	
 	classIndex := slices.IndexFunc(s.classes, classWithName(className))
 	if classIndex == -1 {
 		http.Error(w, "no such class", 404)
@@ -316,6 +421,7 @@ func (s *Server) handleDataInstance(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprint(err), 500)
 		return
 	}
+	defer rc.Close()
 	_, err = io.Copy(w, rc)
 	if err != nil {
 		http.Error(w, fmt.Sprint(err), 500)
