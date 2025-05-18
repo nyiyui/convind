@@ -9,6 +9,7 @@ const newPageButton = document.getElementById('button-page-new');
 
 newPageButton.addEventListener('click', navigateNewPage);
 
+page('/', () => page.redirect('/page-list'));
 page('/ribbon', showRibbon);
 page('/data/:id', showData);
 page('/page-list', showPageList);
