@@ -63,6 +63,7 @@ func (s *Server) setupRoutes() {
 	s.mux.HandleFunc("GET /api/v1/pages", s.handlePageList)
 	s.mux.HandleFunc("POST /api/v1/data/new", s.handleDataNew)
 	s.mux.HandleFunc("GET /api/v1/data/{id}", s.handleData)
+	s.mux.HandleFunc("DELETE /api/v1/data/{id}", s.handleDeleteData)
 	s.mux.HandleFunc("GET /api/v1/data/{id}/instances", s.handleDataInstances)
 	s.mux.HandleFunc("GET /api/v1/data/{id}/instance/{className}", s.handleDataInstance)
 
@@ -321,6 +322,22 @@ func (s *Server) handleDataInstance(w http.ResponseWriter, r *http.Request) {
 		// probably, the 200 header has already been written, but whatever
 		return
 	}
+}
+
+func (s *Server) handleDeleteData(w http.ResponseWriter, r *http.Request) {
+	idRaw := r.PathValue("id")
+	id := new(data.ID)
+	err := id.UnmarshalText([]byte(idRaw))
+	if err != nil {
+		http.Error(w, "invalid id", 404)
+		return
+	}
+	err = s.dataStore.DeleteByID(*id)
+	if err != nil {
+		http.Error(w, fmt.Sprint(err), 500)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // getDataRevision returns the revision requested by the revision-id query parameter, or the latest revision otherwise.

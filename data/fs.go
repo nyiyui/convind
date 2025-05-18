@@ -68,6 +68,10 @@ func (f *FSDataStore) AllIDs() ([]ID, error) {
 	return ids, nil
 }
 
+func (f *FSDataStore) DeleteByID(id ID) error {
+	return os.RemoveAll(filepath.Join(f.prefix, id.String()))
+}
+
 type FSData struct {
 	prefix   string
 	id       ID

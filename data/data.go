@@ -91,6 +91,7 @@ type DataStore interface {
 	GetDataByID(ID) (Data, error)
 	New(mimeType string) (Data, error)
 	AllIDs() ([]ID, error)
+	DeleteByID(ID) error
 }
 
 type Data interface {
