@@ -173,3 +173,18 @@ type dataRevisionJSON struct {
 func dataRevisionToJSON(dr DataRevision) dataRevisionJSON {
 	return dataRevisionJSON{dr.RevisionID(), dr.CreationTime()}
 }
+
+// LatestRevision returns the latest revision if available, and nil is there are no revisions at all.
+func LatestRevision(d Data) (DataRevision, error) {
+	revisions, err := d.Revisions()
+	if err != nil {
+		return nil, err
+	}
+	var latestRevision DataRevision
+	for _, revision := range revisions {
+		if latestRevision == nil || revision.CreationTime().After(latestRevision.CreationTime()) {
+			latestRevision = revision
+		}
+	}
+	return latestRevision, nil
+}

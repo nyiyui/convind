@@ -7,6 +7,7 @@ import (
 	"log"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -65,18 +66,18 @@ func getTextContent(n ast.Node, source []byte) string {
 
 	// Build context from surrounding text
 	var context strings.Builder
-	
+
 	// Get the parent node to find siblings
 	parent := n.Parent()
 	if parent == nil {
 		// If no parent, just get the node's own text
 		return extractNodeText(n, source)
 	}
-	
+
 	// Find the current node among its siblings
 	var prevSibling, nextSibling ast.Node
 	var foundCurrent bool
-	
+
 	// Traverse siblings to find current node, previous, and next
 	for child := parent.FirstChild(); child != nil; child = child.NextSibling() {
 		if child == n {
@@ -88,7 +89,7 @@ func getTextContent(n ast.Node, source []byte) string {
 			break
 		}
 	}
-	
+
 	// Extract text from previous sibling (if exists)
 	if prevSibling != nil {
 		prevText := truncateText(extractNodeText(prevSibling, source), 30)
@@ -97,11 +98,11 @@ func getTextContent(n ast.Node, source []byte) string {
 			context.WriteString(" … ")
 		}
 	}
-	
+
 	// Extract text from current node
 	nodeText := extractNodeText(n, source)
 	context.WriteString(nodeText)
-	
+
 	// Extract text from next sibling (if exists)
 	if nextSibling != nil {
 		nextText := truncateText(extractNodeText(nextSibling, source), 30)
@@ -110,7 +111,7 @@ func getTextContent(n ast.Node, source []byte) string {
 			context.WriteString(nextText)
 		}
 	}
-	
+
 	return context.String()
 }
 
@@ -119,9 +120,9 @@ func extractNodeText(n ast.Node, source []byte) string {
 	if n == nil {
 		return ""
 	}
-	
+
 	var sb strings.Builder
-	
+
 	// If it's a text node, extract its content
 	if text, ok := n.(*ast.Text); ok {
 		if text.Segment.Start < len(source) && text.Segment.Stop <= len(source) && text.Segment.Start < text.Segment.Stop {
@@ -129,7 +130,7 @@ func extractNodeText(n ast.Node, source []byte) string {
 		}
 		return sb.String()
 	}
-	
+
 	// Otherwise recursively extract text from children
 	if n.HasChildren() {
 		for c := n.FirstChild(); c != nil; c = c.NextSibling() {
@@ -142,7 +143,7 @@ func extractNodeText(n ast.Node, source []byte) string {
 			}
 		}
 	}
-	
+
 	return sb.String()
 }
 
@@ -152,7 +153,7 @@ func truncateText(text string, maxLength int) string {
 	if len(text) <= maxLength {
 		return text
 	}
-	
+
 	// For very long texts, take the last part which is likely more relevant to the link
 	return text[len(text)-maxLength:]
 }
@@ -160,9 +161,10 @@ func truncateText(text string, maxLength int) string {
 type WikiClass struct {
 	dataStore data.DataStore
 
-	aList     []wikiEdge
-	titles    map[data.ID]string
-	mimeTypes map[data.ID]string
+	aList              []wikiEdge
+	titles             map[data.ID]string
+	mimeTypes          map[data.ID]string
+	latestCreationTime time.Time
 }
 
 type wikiEdge struct {
@@ -179,6 +181,44 @@ func NewWikiClass(dataStore data.DataStore) *WikiClass {
 
 func (c *WikiClass) Name() string {
 	return "inaba.kiyuri.ca/2025/convind/wiki"
+}
+
+func (c *WikiClass) getLatestCreationTime() (time.Time, error) {
+	var latestCreationTime time.Time
+	ids, err := c.dataStore.AllIDs()
+	if err != nil {
+		return time.Time{}, nil
+	}
+	for _, id := range ids {
+		d, err := c.dataStore.GetDataByID(id)
+		if err != nil {
+			return time.Time{}, nil
+		}
+		dr, err := data.LatestRevision(d)
+		if err != nil {
+			return time.Time{}, nil
+		}
+		if dr == nil {
+			continue
+		}
+		ct := dr.CreationTime()
+		if ct.After(latestCreationTime) {
+			latestCreationTime = ct
+		}
+	}
+	return latestCreationTime, nil
+}
+
+func (c *WikiClass) ReloadIfOutdated() error {
+	lct, err := c.getLatestCreationTime()
+	if err != nil {
+		return err
+	}
+	if lct.After(c.latestCreationTime) {
+		c.latestCreationTime = lct
+		return c.Load()
+	}
+	return nil
 }
 
 func (c *WikiClass) Load() error {
@@ -218,6 +258,12 @@ func (c *WikiClass) Load() error {
 		if err != nil {
 			return err
 		}
+		slices.SortFunc(links, func(a, b link) int {
+			return strings.Compare(a.Destination, b.Destination)
+		})
+		links = slices.CompactFunc(links, func(a, b link) bool {
+			return a.Destination == b.Destination && a.Context == b.Context
+		})
 		for _, link := range links {
 			if strings.HasPrefix(link.Destination, "convind://") {
 				id2, err := data.ParseID(link.Destination[10:])
@@ -246,6 +292,7 @@ func (c *WikiClass) Load() error {
 }
 
 func (c *WikiClass) AttemptInstance(dr data.DataRevision) (data.Instance, error) {
+	c.ReloadIfOutdated()
 	// non text/markdown files may be linked to
 	i := WikiInstance{class: c, title: c.titles[dr.Data().ID()]}
 	for _, edge := range c.aList {
@@ -255,6 +302,12 @@ func (c *WikiClass) AttemptInstance(dr data.DataRevision) (data.Instance, error)
 			i.hop1 = append(i.hop1, hopWithContext{edge.Src, edge.SrcContext})
 		}
 	}
+	slices.SortFunc(i.hop1, func(a, b hopWithContext) int {
+		return strings.Compare(a.ID.String(), b.ID.String())
+	})
+	i.hop1 = slices.CompactFunc(i.hop1, func(a, b hopWithContext) bool {
+		return a.ID == b.ID && a.Context == b.Context
+	})
 	// sort.Slice(i.hop1, func(j, k int) bool {
 	// 	return i.hop1[j].String() < i.hop1[k].String()
 	// })
@@ -266,6 +319,12 @@ func (c *WikiClass) AttemptInstance(dr data.DataRevision) (data.Instance, error)
 			i.hop2 = append(i.hop2, edge.Src)
 		}
 	}
+	slices.SortFunc(i.hop2, func(a, b data.ID) int {
+		return strings.Compare(a.String(), b.String())
+	})
+	i.hop2 = slices.CompactFunc(i.hop2, func(a, b data.ID) bool {
+		return a.String() == b.String()
+	})
 	return &i, nil
 }
 
