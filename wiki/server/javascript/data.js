@@ -16,6 +16,7 @@ class Data extends HTMLElement {
   connectedCallback() {
     this.instancesWrapper = document.createElement("div");
     this.instancesWrapper.classList.add('instances-wrapper');
+    this.instancesWrapper.textContent = "Loading instances…";
 
     const shadow = this.attachShadow({mode: "open"});
     const style = document.createElement("style");
@@ -59,40 +60,64 @@ class Data extends HTMLElement {
         this.loadInstances();
       });
   }
+  async makeInstanceElem(className) {
+    const instanceUrl = `/api/v1/data/${this.id}/instance/${encodeURIComponent(className)}`;
+    const resp = await fetch(instanceUrl);
+    if (!resp.ok) return;
+    if (className === "inaba.kiyuri.ca/2025/convind/wiki") {
+      return this.loadWikiInstance(await resp.json());
+    }
+    if (resp.headers.get("Content-Type").startsWith("image/")) {
+      const img = document.createElement('img');
+      img.src = instanceUrl;
+      return img;
+    }
+    if (resp.headers.get("Content-Type").startsWith("text/")) {
+      return document.createTextNode(await resp.text());
+    }
+    if (resp.headers.get("Content-Type") === "application/json") {
+      const elem = document.createElement("code");
+      elem.textContent = JSON.stringify(await resp.json(), null, 1);
+      return elem;
+    }
+    return null;
+  };
   async loadInstances() {
     console.log('this.classNames', this.classNames);
-    let elems = await Promise.all(this.classNames.map(async (className) => {
-      const instanceUrl = `/api/v1/data/${this.id}/instance/${encodeURIComponent(className)}`;
-      const resp = await fetch(instanceUrl);
-      if (!resp.ok) return;
-      if (className === "inaba.kiyuri.ca/2025/convind/wiki") {
-        return { className, elem: this.loadWikiInstance(await resp.json()) };
-      }
-      if (resp.headers.get("Content-Type").startsWith("image/")) {
-        const img = document.createElement('img');
-        img.src = instanceUrl;
-        return { className, elem: img }
-      }
-      if (resp.headers.get("Content-Type").startsWith("text/")) {
-        return { className, elem: document.createTextNode(await resp.text()) }
-      }
-      if (resp.headers.get("Content-Type") === "application/json") {
-        const elem = document.createElement("code");
-        elem.textContent = JSON.stringify(await resp.json(), null, 1);
-        return { className, elem };
-      }
-      return null;
-    }));
-    elems = elems.filter((entry) => !!entry);
     this.instancesWrapper.textContent = '';
-    elems.forEach(({ className, elem }) => {
+    
+    // Create a map to store elements by className
+    const elementsMap = new Map();
+    
+    // Process all class names and create their elements
+    const processPromises = this.classNames.map(async (className) => {
+      const elem = await this.makeInstanceElem(className);
+      if (!elem) return;
+      
       const e = document.createElement("div");
+      e.dataset.className = className; // Store className for sorting
       const h2 = document.createElement("h2");
       h2.textContent = className;
       e.appendChild(h2);
       e.appendChild(elem);
-      this.instancesWrapper.appendChild(e);
-    })
+      
+      // Store in map
+      elementsMap.set(className, e);
+    });
+    
+    // Wait for all elements to be created
+    await Promise.all(processPromises);
+    
+    // Sort the class names
+    const sortedClassNames = Array.from(elementsMap.keys()).sort();
+    
+    // Add elements to the instancesWrapper in sorted order
+    sortedClassNames.forEach(className => {
+      const element = elementsMap.get(className);
+      if (element) {
+        this.instancesWrapper.appendChild(element);
+      }
+    });
   }
   loadWikiInstance(data) {
     const hops = document.createElement("div");
