@@ -160,6 +160,7 @@ class Data extends HTMLElement {
       li.appendChild(a);
       hop2.appendChild(li);
     });
+    document.title = data.title;
     console.log('hops', hops);
     return hops;
   }

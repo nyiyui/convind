@@ -17,6 +17,7 @@ page(showNotFound);
 page();
 
 function showRibbon(ctx, next) {
+  document.title = "ribbon";
   main.textContent = '';
 
   const params = new URLSearchParams(ctx.querystring);
@@ -24,6 +25,7 @@ function showRibbon(ctx, next) {
 }
 
 function showData(ctx, next) {
+  document.title = "data";
   main.textContent = '';
 
   const id = ctx.params.id;
@@ -31,6 +33,7 @@ function showData(ctx, next) {
 }
 
 function showPageList(ctx, next) {
+  document.title = "page list";
   main.textContent = '';
 
   main.appendChild(new PageList());
