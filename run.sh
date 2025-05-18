@@ -47,8 +47,8 @@ trap cleanup EXIT INT TERM
 # Initial server start
 start_server
 
-# Watch for changes
-while inotifywait -e create -e delete -e modify -r .
+# Watch for changes but ignore sample-store directory
+while inotifywait -e create -e delete -e modify -r --exclude '(^|/)(sample-store|\.git)(/|$)' .
 do
   restart_server
 done
