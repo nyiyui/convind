@@ -205,10 +205,8 @@ class MarkdownEditor extends HTMLElement {
   }
   
   wrapImagesWithLinks() {
-    // Find all images in the viewer that have src starting with /api/v1/data/
     const images = Array.from(this.viewer.querySelectorAll('img[src^="/api/v1/data/"]'));
     
-    // Process each image
     images.forEach(img => {
       const src = img.getAttribute('src');
       const id = src.split('/').pop(); // Get the ID from the end of the URL
@@ -218,9 +216,10 @@ class MarkdownEditor extends HTMLElement {
         // Create a link element that points to the data
         const link = document.createElement('a');
         link.href = `/data/${id}`;
-        link.target = '_blank'; // Open in new tab
         
-        // Replace the image with the link containing the image
+        const className = "inaba.kiyuri.ca/2025/convind/cmd/wiki-server/thumb";
+        img.src = `/api/v1/data/${id}/instance/${encodeURIComponent(className)}`;
+        
         img.parentNode.insertBefore(link, img);
         link.appendChild(img);
       }
@@ -236,30 +235,19 @@ class MarkdownEditor extends HTMLElement {
     //this.editor.setSelectionRange(startIndex, endIndex+1);
   }
   onEditorClick(event) {
-    // Get the current line number in the editor
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
-    
-    // Find which list item contains the cursor
     let currentNode = selection.anchorNode;
-    
-    // Navigate up to find the LI element
+    // Navigate up to find the element containing the line
     while (currentNode && currentNode.nodeName !== 'LI') {
       currentNode = currentNode.parentNode;
     }
-    
     if (!currentNode) return;
     
-    // Get the line number (zero-based index in the OL)
     const lineNumber = Array.from(currentNode.parentNode.children).indexOf(currentNode) + 1;
-    
-    // Find an element in the viewer with a sourcepos attribute starting with this line number
     const sourceposPattern = `${lineNumber}:`;
-    
-    // Look for elements with matching sourcepos in the viewer
-    const elements = Array.from(this.viewer.querySelectorAll('[data-sourcepos]'));
-    
     // Find elements whose sourcepos starts with our line number
+    const elements = Array.from(this.viewer.querySelectorAll('[data-sourcepos]'));
     const matchingElements = elements.filter(el => {
       const sourcepos = el.dataset.sourcepos;
       if (!sourcepos) return false;
