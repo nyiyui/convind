@@ -44,6 +44,11 @@ class MarkdownEditor extends HTMLElement {
       height: 100vh;
       position: relative;
     }
+    @media only screen and (max-width: 600px) {
+      .wrapper {
+        flex-direction: column;
+      }
+    }
     .viewer {
       flex: 1;
       overflow: auto;

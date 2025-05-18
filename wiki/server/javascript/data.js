@@ -25,6 +25,11 @@ class Data extends HTMLElement {
       display: flex;
       flex-direction: row;
     }
+    @media only screen and (max-width: 900px) {
+      .wrapper {
+        flex-direction: column;
+      }
+    }
     .wrapper > :not(.instances-wrapper) {
       flex: 2;
     }
