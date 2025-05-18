@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
-set -x
-
 if [ -z "$CONVIND_STORE_PATH" ]; then
   CONVIND_STORE_PATH="./sample-store/"
 fi
 
-set -euxo pipefail
+set -euo pipefail
 
 # Store the server PID
 SERVER_PID=""
