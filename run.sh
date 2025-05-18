@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+set -x
+
+if [ -z "$CONVIND_STORE_PATH" ]; then
+  CONVIND_STORE_PATH="./sample-store/"
+fi
+
 set -euxo pipefail
 
 # Store the server PID
@@ -25,7 +31,7 @@ kill_server() {
 # Function to start the server
 start_server() {
   echo "Starting server..."
-  go run ./cmd/wiki-server/main.go -data-store ./sample-store/ &
+  go run ./cmd/wiki-server/main.go -data-store "$CONVIND_STORE_PATH" &
   SERVER_PID=$!
   echo "Server started with PID: $SERVER_PID"
 }
