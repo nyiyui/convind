@@ -94,38 +94,92 @@ class MarkdownEditor extends HTMLElement {
     this.render();
   }
   onPaste(event) {
-    console.log(event.clipboardData);
-    console.log(event.clipboardData.files);
-    console.log(event.clipboardData.files[0]);
-    Array.from(event.clipboardData.items).forEach(async (item) => {
-      let textToAdd = '';
-      if (item.kind === "file") {
-        const resp = await fetch('/api/v1/data/new', {
-          method: "POST",
-          body: item.getAsFile(),
-          headers: {
-            "Content-Type": item.type,
-          },
-        });
-        if (!resp.ok) throw new Error(resp.status);
-        const id = (new URL(resp.url)).pathname.split('/').slice(-1);
-        const isImage = item.type.startsWith("image/");
-        textToAdd = (isImage ? '!' : '') + `[](/api/v1/data/${id})`;
-      } else if (item.kind === "string") {
-        textToAdd += await (new Promise((resolve, reject) => {
-          item.getAsString(resolve);
-        }));
-      }
-      const selection = window.getSelection();
-      if (!selection.rangeCount) return;
-      selection.deleteFromDocument();
-      selection.getRangeAt(0)
-        .insertNode(document.createTextNode(textToAdd));
-      selection.collapseToEnd();
-      this.onChange(null);
-      this.editor.dispatchEvent(new Event("input"));
-    });
-    event.preventDefault();
+    // Process only file items (direct files, not HTML)
+    const hasFiles = Array.from(event.clipboardData.items).some(item => 
+      item.kind === "file" && item.type.startsWith("image/"));
+      
+    if (hasFiles) {
+      // If we have files, only process those and ignore text/html
+      event.preventDefault();
+      
+      // Process all items
+      Array.from(event.clipboardData.items).forEach(async (item) => {
+        if (item.kind === "file") {
+          const file = item.getAsFile();
+          if (!file) return;
+          
+          if (file.type.startsWith("image/")) {
+            try {
+              const resp = await fetch('/api/v1/data/new', {
+                method: "POST",
+                body: file,
+                headers: {
+                  "Content-Type": file.type,
+                },
+              });
+              
+              if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
+              
+              // Get ID from the response URL
+              const url = new URL(resp.url);
+              const urlParts = url.pathname.split('/');
+              const id = urlParts[urlParts.length - 1]; // Get the last part of the path
+              
+              // Insert markdown for image
+              const textToAdd = `![](/api/v1/data/${id})`;
+              
+              // Insert at cursor position
+              const selection = window.getSelection();
+              if (!selection.rangeCount) return;
+              selection.deleteFromDocument();
+              selection.getRangeAt(0).insertNode(document.createTextNode(textToAdd));
+              selection.collapseToEnd();
+              
+              this.onChange(null);
+              this.editor.dispatchEvent(new Event("input"));
+            } catch (error) {
+              console.error("Failed to upload image:", error);
+            }
+          } else {
+            // Non-image file
+            try {
+              const resp = await fetch('/api/v1/data/new', {
+                method: "POST",
+                body: file,
+                headers: {
+                  "Content-Type": file.type || "application/octet-stream",
+                },
+              });
+              
+              if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
+              
+              // Get ID from the response URL
+              const url = new URL(resp.url);
+              const urlParts = url.pathname.split('/');
+              const id = urlParts[urlParts.length - 1]; // Get the last part of the path
+              
+              // Insert plain link for non-image files
+              const textToAdd = `[](/api/v1/data/${id})`;
+              
+              const selection = window.getSelection();
+              if (!selection.rangeCount) return;
+              selection.deleteFromDocument();
+              selection.getRangeAt(0).insertNode(document.createTextNode(textToAdd));
+              selection.collapseToEnd();
+              
+              this.onChange(null);
+              this.editor.dispatchEvent(new Event("input"));
+            } catch (error) {
+              console.error("Failed to upload file:", error);
+            }
+          }
+        }
+      });
+      return;
+    }
+    
+    // If no files are present, let the default paste behavior handle text content
+    // This will fall through to the browser's default handling of text pasting
   }
   render() {
     const parsed = this.parser.parse(this.source)
