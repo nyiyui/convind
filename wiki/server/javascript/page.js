@@ -29,10 +29,13 @@ class Page extends HTMLElement {
     wrapper.classList.add('wrapper');
     this.editor.id = 'main-editor';
     this.editor.editor.addEventListener('input', async (event) => {
-      this.progressSetIndeterminate();
+      let done = false;
+      setTimeout(() => {
+        if (!done) this.progressSetIndeterminate();
+      }, 100);
       const newSource = this.editor.getEditorContent();
-      console.log(newSource);
       const resp = await fetch(`/api/v1/page/${this.id}`, { method: "POST", body: newSource });
+      done = true;
       this.progressSetDone();
       if (!resp.ok) {
         throw new Error(`resp not ok: ${resp.status}`);
