@@ -21,15 +21,17 @@ class PageList extends HTMLElement {
     fetch('/api/v1/pages')
       .then((resp) => resp.json())
       .then((pageEntries) => {
-        pageEntries  
+        const pageEntries2 = pageEntries  
           .filter((pageEntry) => pageEntry.Data.Revisions.length !== 0)
           .filter((pageEntry) => pageEntry.Data.MIMEType === "text/markdown")
-          .sort((a, b) => { latestCreationTime(b.Data) - latestCreationTime(a.Data); })
+          .sort((a, b) => latestCreationTime(b.Data) - latestCreationTime(a.Data))
+        pageEntries2
           .forEach((pageEntry) => {
             const li = document.createElement("li");
             const a = document.createElement("a");
             a.href = `/data/${pageEntry.Data.ID}`;
-            a.textContent = pageEntry.LatestRevisionTitle;
+            a.textContent = pageEntry.LatestRevisionTitle
+            a.textContent = a.textContent;
             li.appendChild(a);
             ul.appendChild(li);
           });
