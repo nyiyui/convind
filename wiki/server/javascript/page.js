@@ -6,6 +6,9 @@ function formatTime(t) {
   if (delta < 60) {
     return "less than a minute ago";
   } else if (delta < 2*3600) {
+    if (1 === Math.floor(delta/60)) {
+      return "a minute ago";
+    }
     return `${Math.floor(delta/60)} minutes ago`;
   } else if (delta < 24*3600) {
     return `${Math.floor(delta/3600)} hours and ${Math.floor(delta/60) % 60} minutes ago`;
