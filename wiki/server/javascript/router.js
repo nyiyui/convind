@@ -13,6 +13,7 @@ page('/', () => page.redirect('/page-list'));
 page('/ribbon', showRibbon);
 page('/data/:id', showData);
 page('/page-list', showPageList);
+page('/page/new', () => navigateNewPage());
 page(showNotFound);
 page();
 
