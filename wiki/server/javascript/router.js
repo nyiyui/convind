@@ -5,9 +5,6 @@ import { Data } from './data.js';
 import { PageList } from './page-list.js';
 
 const main = document.querySelector('body > main');
-const newPageButton = document.getElementById('button-page-new');
-
-newPageButton.addEventListener('click', navigateNewPage);
 
 page('/', () => page.redirect('/page-list'));
 page('/ribbon', showRibbon);
