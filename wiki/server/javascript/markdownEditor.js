@@ -86,6 +86,7 @@ class MarkdownEditor extends HTMLElement {
     this.editor.addEventListener("paste", this.onPaste.bind(this));
     this.editor.addEventListener("click", this.onEditorClick.bind(this));
     this.editor.addEventListener("keyup", this.onEditorClick.bind(this));
+    this.editor.addEventListener("keydown", this.onKeyDown.bind(this));
     wrapper.appendChild(this.editor);
     shadow.appendChild(wrapper);
   }
@@ -387,6 +388,53 @@ class MarkdownEditor extends HTMLElement {
       behavior: 'smooth',
       block: 'center'
     });
+  }
+  
+  onKeyDown(event) {
+    // Handle Enter key on empty lines
+    if (event.key === 'Enter') {
+      const selection = window.getSelection();
+      if (!selection.rangeCount) return;
+      
+      let currentNode = selection.anchorNode;
+      
+      // Navigate up to find the line element (li)
+      while (currentNode && currentNode.nodeName !== 'LI') {
+        currentNode = currentNode.parentNode;
+      }
+      
+      if (currentNode && currentNode.textContent.trim() === '') {
+        // This is an empty line, prevent default behavior
+        event.preventDefault();
+        
+        // Get the parent ol element
+        const ol = currentNode.parentNode;
+        
+        // Create a new empty li element
+        const newLi = document.createElement('li');
+        newLi.textContent = '';
+        
+        // Find the index of the current li
+        const index = Array.from(ol.children).indexOf(currentNode);
+        
+        // Insert the new li after the current one
+        if (index === ol.children.length - 1) {
+          ol.appendChild(newLi);
+        } else {
+          ol.insertBefore(newLi, ol.children[index + 1]);
+        }
+        
+        // Move cursor to the new line
+        const range = document.createRange();
+        range.setStart(newLi, 0);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        // Trigger input event to update the source
+        this.editor.dispatchEvent(new Event('input'));
+      }
+    }
   }
   onPotentialAutocomplete() {
     const selection = window.getSelection();
