@@ -120,6 +120,69 @@ class MarkdownEditor extends HTMLElement {
     const hasFiles = Array.from(event.clipboardData.items).some(item => 
       item.kind === "file" && item.type.startsWith("image/"));
       
+    // Check if HTML content with links is being pasted
+    const hasHtml = event.clipboardData.types.includes('text/html');
+    
+    if (hasHtml) {
+      const html = event.clipboardData.getData('text/html');
+      
+      // Create a temporary DOM element to parse the HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = html;
+      
+      // Find all links in the pasted HTML
+      const links = tempDiv.querySelectorAll('a');
+      
+      // If we found links, convert them to markdown format
+      if (links.length > 0) {
+        event.preventDefault();
+        
+        // Get the plain text version for cases where we don't process links
+        let plainText = event.clipboardData.getData('text/plain');
+        
+        // Create a document fragment to hold our processed content
+        const fragment = new DocumentFragment();
+        
+        // If the HTML is primarily links, convert each to markdown
+        if (links.length === tempDiv.querySelectorAll('*').length) {
+          // The content is primarily links
+          links.forEach(link => {
+            const linkText = link.textContent.trim();
+            const linkUrl = link.getAttribute('href');
+            
+            if (linkUrl) {
+              // Create a text node with markdown link
+              const markdownLink = `[${linkText}](${linkUrl})`;
+              fragment.appendChild(document.createTextNode(markdownLink));
+              
+              // Add space between links if needed
+              if (link !== links[links.length - 1]) {
+                fragment.appendChild(document.createTextNode(' '));
+              }
+            } else {
+              // Just add the text if there's no href
+              fragment.appendChild(document.createTextNode(linkText));
+            }
+          });
+        } else {
+          // Mixed content - insert as plain text but convert direct links
+          plainText = plainText.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)');
+          fragment.appendChild(document.createTextNode(plainText));
+        }
+        
+        // Insert at cursor position
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        selection.deleteFromDocument();
+        selection.getRangeAt(0).insertNode(fragment);
+        selection.collapseToEnd();
+        
+        this.onChange(null);
+        this.editor.dispatchEvent(new Event("input"));
+        return;
+      }
+    }
+      
     if (hasFiles) {
       // If we have files, only process those and ignore text/html
       event.preventDefault();
@@ -200,7 +263,7 @@ class MarkdownEditor extends HTMLElement {
       return;
     }
     
-    // If no files are present, let the default paste behavior handle text content
+    // If no files or links are present, let the default paste behavior handle text content
     // This will fall through to the browser's default handling of text pasting
   }
   render() {
