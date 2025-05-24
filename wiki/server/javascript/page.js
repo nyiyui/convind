@@ -59,6 +59,14 @@ class Page extends HTMLElement {
     const wrapper = document.createElement("div");
     wrapper.classList.add('wrapper');
     this.editor.id = 'main-editor';
+    
+    // Listen for title changes from the editor
+    this.editor.addEventListener('titlechange', (event) => {
+      const title = event.detail.title;
+      // Update the document title (just the page title)
+      document.title = title || 'no title';
+    });
+    
     this.editor.editor.addEventListener('input', async (event) => {
       let done = false;
       setTimeout(() => {

@@ -34,6 +34,7 @@ class MarkdownEditor extends HTMLElement {
     this.viewer = document.createElement("div");
     this.editor = document.createElement("div");
     this.editor.contentEditable = true;
+    this.currentTitle = ''; // Store the current title for change detection
   }
   connectedCallback() {
     const shadow = this.attachShadow({mode: "open"});
@@ -107,6 +108,7 @@ class MarkdownEditor extends HTMLElement {
     this.source = s;
     this.refreshEditorContent();
     this.render();
+    // No need to call detectAndEmitTitle() explicitly as it's called in render()
   }
   onChange(event) {
     this.source = this.getEditorContent();
@@ -274,6 +276,38 @@ class MarkdownEditor extends HTMLElement {
     
     // Add links around images that point to /data/<id>
     this.wrapImagesWithLinks();
+
+    // Detect title (H1) and emit event if changed
+    this.detectAndEmitTitle();
+  }
+  
+  detectAndEmitTitle() {
+    // Try to find the first H1 element in the rendered content
+    const h1 = this.viewer.querySelector('h1');
+    let newTitle = '';
+    
+    if (h1) {
+      // Use H1 content as title if found
+      newTitle = h1.textContent.trim();
+    } else {
+      // Fallback: use first line as title
+      const firstLine = this.source.split('\n')[0] || '';
+      newTitle = firstLine.trim();
+    }
+    
+    // Only emit event if title has changed
+    if (newTitle && newTitle !== this.currentTitle) {
+      this.currentTitle = newTitle;
+      
+      // Create and dispatch titlechange event
+      const event = new CustomEvent('titlechange', {
+        detail: { title: newTitle },
+        bubbles: true,
+        composed: true
+      });
+      
+      this.dispatchEvent(event);
+    }
   }
   
   wrapImagesWithLinks() {
