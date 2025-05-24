@@ -195,70 +195,33 @@ class MarkdownEditor extends HTMLElement {
           const file = item.getAsFile();
           if (!file) return;
           
-          if (file.type.startsWith("image/")) {
-            try {
-              const resp = await fetch('/api/v1/data/new', {
-                method: "POST",
-                body: file,
-                headers: {
-                  "Content-Type": file.type,
-                },
-              });
-              
-              if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
-              
-              // Get ID from the response URL
-              const url = new URL(resp.url);
-              const urlParts = url.pathname.split('/');
-              const id = urlParts[urlParts.length - 1]; // Get the last part of the path
-              
-              // Insert markdown for image
-              const textToAdd = `![](/api/v1/data/${id})`;
-              
-              // Insert at cursor position
-              const selection = window.getSelection();
-              if (!selection.rangeCount) return;
-              selection.deleteFromDocument();
-              selection.getRangeAt(0).insertNode(document.createTextNode(textToAdd));
-              selection.collapseToEnd();
-              
-              this.onChange(null);
-              this.editor.dispatchEvent(new Event("input"));
-            } catch (error) {
-              console.error("Failed to upload image:", error);
-            }
-          } else {
-            // Non-image file
-            try {
-              const resp = await fetch('/api/v1/data/new', {
-                method: "POST",
-                body: file,
-                headers: {
-                  "Content-Type": file.type || "application/octet-stream",
-                },
-              });
-              
-              if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
-              
-              // Get ID from the response URL
-              const url = new URL(resp.url);
-              const urlParts = url.pathname.split('/');
-              const id = urlParts[urlParts.length - 1]; // Get the last part of the path
-              
-              // Insert plain link for non-image files
-              const textToAdd = `[](/api/v1/data/${id})`;
-              
-              const selection = window.getSelection();
-              if (!selection.rangeCount) return;
-              selection.deleteFromDocument();
-              selection.getRangeAt(0).insertNode(document.createTextNode(textToAdd));
-              selection.collapseToEnd();
-              
-              this.onChange(null);
-              this.editor.dispatchEvent(new Event("input"));
-            } catch (error) {
-              console.error("Failed to upload file:", error);
-            }
+          try {
+            // Common upload code for all file types
+            const resp = await fetch('/api/v1/data/new', {
+              method: "POST",
+              body: file,
+              headers: {
+                "Content-Type": file.type || "application/octet-stream",
+              },
+            });
+            
+            if (!resp.ok) throw new Error(`HTTP error! status: ${resp.status}`);
+            
+            // Get ID from the response URL
+            const url = new URL(resp.url);
+            const urlParts = url.pathname.split('/');
+            const id = urlParts[urlParts.length - 1]; // Get the last part of the path
+            
+            // Create appropriate markdown syntax based on file type
+            const textToAdd = file.type.startsWith("image/") 
+              ? `![](/api/v1/data/${id})` // Image markdown
+              : `[](/api/v1/data/${id})`; // Regular file link markdown
+            
+            // Insert the markdown at cursor position
+            this.insertTextAtCursor(textToAdd);
+            
+          } catch (error) {
+            console.error(`Failed to upload ${file.type.startsWith("image/") ? "image" : "file"}:`, error);
           }
         }
       });
@@ -267,6 +230,47 @@ class MarkdownEditor extends HTMLElement {
     
     // If no files or links are present, let the default paste behavior handle text content
     // This will fall through to the browser's default handling of text pasting
+  }
+  
+  // Helper method to insert text at the current cursor position in the editor
+  insertTextAtCursor(text) {
+    // Get cursor position in the editor
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    // Find the current line (li element) where the cursor is
+    let currentNode = selection.anchorNode;
+    
+    // Navigate up to find the line element
+    while (currentNode && currentNode.nodeName !== 'LI') {
+      currentNode = currentNode.parentNode;
+    }
+    
+    if (!currentNode) {
+      // Fallback: if we couldn't find the line, just add it to the editor content
+      this.source += '\n' + text;
+      this.refreshEditorContent();
+    } else {
+      // Get the text before and after cursor
+      const li = currentNode;
+      const lineText = li.textContent;
+      const cursorPosition = selection.anchorOffset;
+      
+      // Only apply if cursor is inside an li element's text node
+      if (selection.anchorNode.nodeType === Node.TEXT_NODE) {
+        const beforeCursor = lineText.substring(0, cursorPosition);
+        const afterCursor = lineText.substring(cursorPosition);
+        
+        // Update the line's content with the inserted text
+        li.textContent = beforeCursor + text + afterCursor;
+      } else {
+        // If not in a text node, just append to the line
+        li.textContent += text;
+      }
+    }
+    
+    // Trigger the input event to update the source and render
+    this.editor.dispatchEvent(new Event('input'));
   }
   render() {
     const parsed = this.parser.parse(this.source)
@@ -344,6 +348,7 @@ class MarkdownEditor extends HTMLElement {
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
     let currentNode = selection.anchorNode;
+    console.log('selection', selection);
     // Navigate up to find the element containing the line
     while (currentNode && currentNode.nodeName !== 'LI') {
       currentNode = currentNode.parentNode;
