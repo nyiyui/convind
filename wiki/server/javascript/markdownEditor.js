@@ -348,7 +348,6 @@ class MarkdownEditor extends HTMLElement {
     const selection = window.getSelection();
     if (!selection.rangeCount) return;
     let currentNode = selection.anchorNode;
-    console.log('selection', selection);
     // Navigate up to find the element containing the line
     while (currentNode && currentNode.nodeName !== 'LI') {
       currentNode = currentNode.parentNode;
