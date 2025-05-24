@@ -1,6 +1,16 @@
 import { Page } from './page.js';
 import { Image } from './image.js';
 
+// Utility function to debounce frequent calls
+function debounce(func, wait) {
+  let timeout;
+  return function(...args) {
+    const context = this;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), wait);
+  };
+}
+
 class Data extends HTMLElement {
   constructor(id) {
     super();
@@ -12,6 +22,11 @@ class Data extends HTMLElement {
     ];
     this.classNames = null;
     this.instancesWrapper = null;
+    
+    // Create debounced version of loadClasses to avoid too many refreshes
+    this.debouncedLoadClasses = debounce(() => {
+      this.loadClasses();
+    }, 500); // 500ms debounce time
   }
   connectedCallback() {
     this.instancesWrapper = document.createElement("div");
@@ -47,6 +62,16 @@ class Data extends HTMLElement {
         for (let [pattern, make] of this.constructors) {
           if (pattern === mimeType || (pattern.test && pattern.test(mimeType))) {
             this.showElem = make(this.id);
+            
+            // Listen for revisionChanged events from Page elements
+            if (this.showElem instanceof Page) {
+              this.showElem.addEventListener('revisionChanged', (event) => {
+                console.log('Revision changed event received:', event.detail);
+                // Reload the instances when a revision changes using the debounced method
+                this.debouncedLoadClasses();
+              });
+            }
+            
             wrapper.insertBefore(this.showElem, wrapper.firstChild);
             break;
           }

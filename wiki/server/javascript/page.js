@@ -46,7 +46,22 @@ class Page extends HTMLElement {
   async loadSource() {
     const resp = await fetch(`/api/v1/page/${this.id}`);
     resp.text().then((text) => this.editor.setValue(text));
-    this.latestRevisionIndicator.textContent = formatTime(new Date(Date.parse(resp.headers.get('Last-Modified'))));
+    const lastModified = new Date(Date.parse(resp.headers.get('Last-Modified')));
+    this.latestRevisionIndicator.textContent = formatTime(lastModified);
+    
+    // Get the revision ID from the Revision-ID header
+    const revisionId = resp.headers.get('Revision-ID');
+    
+    // Emit revisionChanged event with the loaded revision ID
+    this.dispatchEvent(new CustomEvent('revisionChanged', {
+      bubbles: true,
+      composed: true, // This allows the event to cross shadow DOM boundaries
+      detail: {
+        id: this.id,
+        revisionId: revisionId,
+        timestamp: lastModified
+      }
+    }));
   }
   connectedCallback() {
     this.loadSource();
@@ -79,6 +94,20 @@ class Page extends HTMLElement {
       if (!resp.ok) {
         throw new Error(`resp not ok: ${resp.status}`);
       }
+      
+      // Get the revision ID from the Revision-ID header
+      const revisionId = resp.headers.get('Revision-ID');
+      
+      // Emit revisionChanged event with the new revision ID
+      this.dispatchEvent(new CustomEvent('revisionChanged', {
+        bubbles: true,
+        composed: true, // This allows the event to cross shadow DOM boundaries
+        detail: {
+          id: this.id,
+          revisionId: revisionId,
+          timestamp: new Date()
+        }
+      }));
     });
     this.progressIndicator = document.createElement("progress");
     this.progressIndicator.max = 100;
