@@ -42,6 +42,11 @@
       nav .right {
         margin-left: auto;
       }
+      @media print {
+        nav {
+          display: none;
+        }
+      }
     </style>
     <title>
       {{ block "title" $ }}{{ end }}

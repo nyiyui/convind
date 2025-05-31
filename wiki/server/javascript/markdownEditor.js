@@ -50,6 +50,14 @@ class MarkdownEditor extends HTMLElement {
         flex-direction: column;
       }
     }
+    @media print {
+      .editor {
+        display: none;
+      }
+      .viewer {
+        padding-right: 0;
+      }
+    }
     .viewer {
       flex: 1;
       overflow: auto;
