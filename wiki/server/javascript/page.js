@@ -1,7 +1,20 @@
 import { MarkdownEditor } from './markdownEditor.js';
 
-function formatTime(t) {
-  console.log(t);
+function formatTime(t, { alwaysAbsolute }) {
+  const f = new Intl.DateTimeFormat("en-CA", {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  if (alwaysAbsolute) {
+    return f.format(t);
+  }
+
   const delta = Math.floor((Date.now() - t.getTime()) / 1000);
   if (delta < 60) {
     return "less than a minute ago";
@@ -13,15 +26,6 @@ function formatTime(t) {
   } else if (delta < 24*3600) {
     return `${Math.floor(delta/3600)} hours and ${Math.floor(delta/60) % 60} minutes ago`;
   } else {
-    const f = new Intl.DateTimeFormat("en-CA", {
-      weekday: "short",
-      year: "numeric",
-      month: "short",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
     return f.format(t);
   }
 }
@@ -47,7 +51,8 @@ class Page extends HTMLElement {
     const resp = await fetch(`/api/v1/page/${this.id}`);
     resp.text().then((text) => this.editor.setValue(text));
     const lastModified = new Date(Date.parse(resp.headers.get('Last-Modified')));
-    this.latestRevisionIndicator.textContent = formatTime(lastModified);
+    this.latestRevisionIndicator.textContent = formatTime(lastModified, { alwaysAbsolute: false });
+    this.latestRevisionIndicatorPrint.textContent = formatTime(lastModified, { alwaysAbsolute: true });
     
     // Get the revision ID from the Revision-ID header
     const revisionId = resp.headers.get('Revision-ID');
@@ -68,6 +73,17 @@ class Page extends HTMLElement {
     const shadow = this.attachShadow({mode: "open"});
     const style = document.createElement("style");
     style.textContent = `
+    .print-show {
+      display: none;
+    }
+    @media print {
+      .print-hide {
+        display: none;
+      }
+      .print-show {
+        display: initial;
+      }
+    }
     `;
     shadow.appendChild(style);
 
@@ -113,7 +129,11 @@ class Page extends HTMLElement {
     this.progressIndicator.max = 100;
     this.progressSetDone();
     this.latestRevisionIndicator = document.createElement("span");
+    this.latestRevisionIndicator.classList.add('print-hide');
+    this.latestRevisionIndicatorPrint = document.createElement("span");
+    this.latestRevisionIndicatorPrint.classList.add('print-show');
     wrapper.appendChild(this.latestRevisionIndicator);
+    wrapper.appendChild(this.latestRevisionIndicatorPrint);
     wrapper.appendChild(this.progressIndicator);
     wrapper.appendChild(this.editor);
     shadow.appendChild(wrapper);
