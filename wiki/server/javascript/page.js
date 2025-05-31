@@ -1,4 +1,5 @@
 import { MarkdownEditor } from './markdownEditor.js';
+import { formatClassName } from './data.js';
 
 function formatTime(t, { alwaysAbsolute }) {
   const f = new Intl.DateTimeFormat("en-CA", {

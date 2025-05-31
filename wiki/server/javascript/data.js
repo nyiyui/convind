@@ -11,6 +11,36 @@ function debounce(func, wait) {
   };
 }
 
+// Format class identifier into a user-friendly name
+function formatClassName(className) {
+  // Handle known special cases
+  if (className === "inaba.kiyuri.ca/2025/convind/wiki") {
+    return "Wiki Links";
+  }
+  
+  // Extract last meaningful part of the path
+  const parts = className.split('/');
+  if (parts.length > 0) {
+    const lastPart = parts[parts.length - 1];
+    // If it's a descriptive name, use it directly
+    if (lastPart && !lastPart.includes('.') && lastPart.length > 1) {
+      // Capitalize and add spaces to camelCase/PascalCase
+      return lastPart.replace(/([A-Z])/g, ' $1').trim();
+    }
+  }
+  
+  // For domain-based class identifiers, extract the domain part
+  if (className.includes('.')) {
+    const domainParts = className.split('.');
+    if (domainParts.length > 1) {
+      return domainParts[0].charAt(0).toUpperCase() + domainParts[0].slice(1);
+    }
+  }
+  
+  // Fallback: return the original but truncated if very long
+  return className.length > 30 ? className.substring(0, 27) + '...' : className;
+}
+
 class Data extends HTMLElement {
   constructor(id) {
     super();
@@ -127,7 +157,8 @@ class Data extends HTMLElement {
       const e = document.createElement("div");
       e.dataset.className = className; // Store className for sorting
       const h2 = document.createElement("h2");
-      h2.textContent = className;
+      h2.textContent = formatClassName(className);
+      h2.title = className; // Keep the full identifier as a tooltip
       e.appendChild(h2);
       e.appendChild(elem);
       
@@ -198,4 +229,4 @@ class Data extends HTMLElement {
 
 window.customElements.define("wiki-data", Data);
 
-export { Data }
+export { Data, formatClassName }
